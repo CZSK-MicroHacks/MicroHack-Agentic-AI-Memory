@@ -67,6 +67,10 @@ export class NativeApp extends LitElement {
   @state() private profileLoading = false;
   @state() private profileGenerating = false;
   @state() private profileToast: string | null = null;
+  @state() private promptModalOpen = false;
+  @state() private promptContent: string | null = null;
+  @state() private promptLoading = false;
+  @state() private promptCopied = false;
 
   @query('.messages-area')
   private messagesArea!: HTMLElement;
@@ -1078,6 +1082,106 @@ export class NativeApp extends LitElement {
       background: light-dark(var(--n-95), var(--n-20));
     }
 
+    /* ── Prompt modal ─────────────────────────────────────── */
+    .prompt-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.45);
+      z-index: 900;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      animation: fadeIn 0.15s ease-out;
+    }
+    .prompt-card {
+      width: 92%;
+      max-width: 860px;
+      max-height: 85vh;
+      display: flex;
+      flex-direction: column;
+      border-radius: 14px;
+      background: light-dark(var(--n-100), var(--n-15));
+      box-shadow: 0 8px 30px rgba(0,0,0,0.25);
+      overflow: hidden;
+      animation: fadeIn 0.2s ease-out;
+    }
+    .prompt-card-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 14px 20px;
+      border-bottom: 1px solid light-dark(var(--n-90), var(--n-25));
+    }
+    .prompt-card-header h3 {
+      margin: 0;
+      font-size: 15px;
+      font-weight: 600;
+      color: light-dark(var(--n-10), var(--n-90));
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .prompt-header-actions {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .prompt-copy-btn {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      padding: 4px 10px;
+      border: 1px solid light-dark(var(--n-90), var(--n-30));
+      border-radius: 6px;
+      background: transparent;
+      color: light-dark(var(--n-50), var(--n-60));
+      font-family: var(--font-family, inherit);
+      font-size: 12px;
+      cursor: pointer;
+      transition: background 0.15s, color 0.15s;
+    }
+    .prompt-copy-btn:hover {
+      background: light-dark(var(--n-95), var(--n-20));
+      color: light-dark(var(--n-10), var(--n-90));
+    }
+    .prompt-copy-btn.copied {
+      color: light-dark(#16a34a, #4ade80);
+      border-color: light-dark(#16a34a, #4ade80);
+    }
+    .prompt-card-body {
+      flex: 1;
+      overflow-y: auto;
+      padding: 20px;
+    }
+    .prompt-card-body::-webkit-scrollbar { width: 4px; }
+    .prompt-card-body::-webkit-scrollbar-track { background: transparent; }
+    .prompt-card-body::-webkit-scrollbar-thumb {
+      background: light-dark(var(--n-80), var(--n-30));
+      border-radius: 2px;
+    }
+    .prompt-code {
+      margin: 0;
+      padding: 16px 20px;
+      border-radius: 10px;
+      background: light-dark(var(--n-10), var(--n-5));
+      color: light-dark(var(--n-90), var(--n-85));
+      font-family: 'SF Mono', 'Fira Code', 'Menlo', monospace;
+      font-size: 12.5px;
+      line-height: 1.7;
+      white-space: pre-wrap;
+      word-break: break-word;
+      overflow-x: auto;
+    }
+    .prompt-loading {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 40px;
+      color: light-dark(var(--n-60), var(--n-50));
+      font-size: 13px;
+      gap: 8px;
+    }
+
     /* ── Animations ───────────────────────────────────────── */
     @keyframes fadeIn {
       from { opacity: 0; transform: translateY(4px); }
@@ -1581,6 +1685,35 @@ export class NativeApp extends LitElement {
     }
   }
 
+  /* ── Prompt modal ────────────────────────────────────────── */
+
+  private async togglePromptModal() {
+    if (this.promptModalOpen) {
+      this.promptModalOpen = false;
+      return;
+    }
+    this.promptModalOpen = true;
+    if (this.promptContent === null) {
+      this.promptLoading = true;
+      try {
+        const data = await this.client.getPrompt('customer_support');
+        this.promptContent = data.content;
+      } catch (err) {
+        console.error('Failed to fetch prompt:', err);
+        this.promptContent = 'Failed to load prompt.';
+      } finally {
+        this.promptLoading = false;
+      }
+    }
+  }
+
+  private async handleCopyPrompt() {
+    if (!this.promptContent) return;
+    await navigator.clipboard.writeText(this.promptContent);
+    this.promptCopied = true;
+    setTimeout(() => { this.promptCopied = false; }, 2000);
+  }
+
   /* ── Chat flow ──────────────────────────────────────────── */
 
   private async send(text: string) {
@@ -1702,6 +1835,7 @@ export class NativeApp extends LitElement {
 
   render() {
     return html`
+      ${this.promptModalOpen ? this.renderPromptModal() : nothing}
       ${this.renderSidebar()}
       <div class="main">
         ${this.renderHeader()}
@@ -1923,6 +2057,9 @@ export class NativeApp extends LitElement {
           ${this.sessionId
             ? html`<button class="hdr-btn" @click=${this.newChat}>New Chat</button>`
             : nothing}
+          <button class="icon-btn" @click=${this.togglePromptModal} title="View system prompt">
+            <span class="material-symbols-outlined" style="font-size:18px">info</span>
+          </button>
           <button class="icon-btn" @click=${this.toggleTheme} title="Toggle theme">
             <span class="material-symbols-outlined" style="font-size:18px">dark_mode</span>
           </button>
@@ -2252,6 +2389,46 @@ export class NativeApp extends LitElement {
 
   private formatKey(key: string): string {
     return key.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+  }
+
+  /* ── Prompt Modal ─────────────────────────────────────────── */
+
+  private renderPromptModal() {
+    return html`
+      <div class="prompt-overlay" @click=${this.togglePromptModal}>
+        <div class="prompt-card" @click=${(e: Event) => e.stopPropagation()}>
+          <div class="prompt-card-header">
+            <h3>
+              <span class="material-symbols-outlined" style="font-size:18px">info</span>
+              System Prompt
+            </h3>
+            <div class="prompt-header-actions">
+              <button
+                class="prompt-copy-btn ${this.promptCopied ? 'copied' : ''}"
+                @click=${this.handleCopyPrompt}
+                ?disabled=${this.promptLoading || !this.promptContent}
+              >
+                <span class="material-symbols-outlined" style="font-size:15px">
+                  ${this.promptCopied ? 'check' : 'content_copy'}
+                </span>
+                ${this.promptCopied ? 'Copied' : 'Copy'}
+              </button>
+              <button class="icon-btn" @click=${this.togglePromptModal}>
+                <span class="material-symbols-outlined" style="font-size:18px">close</span>
+              </button>
+            </div>
+          </div>
+          <div class="prompt-card-body">
+            ${this.promptLoading
+              ? html`<div class="prompt-loading">
+                  <div class="spinner" style="width:16px;height:16px;border:2px solid light-dark(var(--n-80),var(--n-30));border-left-color:light-dark(var(--n-40),var(--n-70));border-radius:50%;animation:spin .8s linear infinite"></div>
+                  Loading…
+                </div>`
+              : html`<pre class="prompt-code">${this.promptContent}</pre>`}
+          </div>
+        </div>
+      </div>
+    `;
   }
 
   private renderInput() {

@@ -322,6 +322,16 @@ export class AGUIClient {
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
   }
 
+  /* ── Prompt ──────────────────────────────────────────────── */
+
+  async getPrompt(name: string): Promise<{ name: string; content: string }> {
+    const res = await fetch(`${this.baseUrl}/prompts/${encodeURIComponent(name)}`, {
+      headers: { ...getAuthHeaders() },
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    return res.json();
+  }
+
   /* ── SSE streaming ─────────────────────────────────────── */
 
   private parseSSEEvent(line: string): AGUIEvent | null {

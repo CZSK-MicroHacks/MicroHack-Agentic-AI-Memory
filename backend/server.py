@@ -18,6 +18,9 @@ import logging
 import os
 import uuid
 from contextlib import asynccontextmanager
+from pathlib import Path
+
+import jinja2
 from datetime import datetime
 from typing import Annotated, Any
 from collections.abc import AsyncIterator
@@ -86,6 +89,24 @@ if not openai_endpoint:
     raise RuntimeError("Missing required environment variable: AZURE_OPENAI_ENDPOINT")
 if not model_deployment:
     raise RuntimeError("Missing required environment variable: AZURE_OPENAI_DEPLOYMENT_NAME")
+
+# =============================================================================
+# Prompt Loading (Jinja2)
+# =============================================================================
+
+_PROMPTS_DIR = Path(__file__).resolve().parent / "prompts"
+_jinja_env = jinja2.Environment(
+    loader=jinja2.FileSystemLoader(str(_PROMPTS_DIR)),
+    keep_trailing_newline=True,
+    undefined=jinja2.StrictUndefined,
+)
+
+def load_prompt(template_name: str, **kwargs: object) -> str:
+    """Render a Jinja2 prompt template from the prompts/ directory."""
+    template = _jinja_env.get_template(template_name)
+    return template.render(**kwargs).strip()
+
+CUSTOMER_SUPPORT_PROMPT = load_prompt("customer_support.j2")
 
 
 # =============================================================================
@@ -422,24 +443,32 @@ chat_client = AzureOpenAIChatClient(
     deployment_name=model_deployment,
 )
 
-# Configure the agent with custom instructions and tools
+# Configure the default agent (no profile — used as fallback)
 agent = ChatAgent(
     name="CustomerSupportAgent",
-    instructions="""You are a helpful customer support assistant. 
-    
-    You have access to a get_order_status tool that can look up order information.
-    
-    IMPORTANT: When a user mentions an order ID (like ORD-001, ORD-002, etc.), 
-    you MUST call the get_order_status tool to retrieve the actual order details.
-    Do NOT make up or guess order information.
-    
-    After calling get_order_status, provide the actual results to the user in a friendly format.
-    
-    Remember the conversation context - if user refers to "it" or "the order", 
-    they are referring to previously discussed orders in this conversation.""",
+    instructions=CUSTOMER_SUPPORT_PROMPT,
     chat_client=chat_client,
     tools=[get_order_status],
 )
+
+
+def _build_personalized_agent(user_profile: dict[str, Any] | None) -> ChatAgent:
+    """Return an agent whose system prompt is enriched with the user profile.
+
+    If *user_profile* is ``None`` or empty the global default agent is
+    returned so we avoid an unnecessary re-render.
+    """
+    if not user_profile:
+        return agent
+
+    personalized_prompt = load_prompt("customer_support.j2", user_profile=user_profile)
+    return ChatAgent(
+        name="CustomerSupportAgent",
+        instructions=personalized_prompt,
+        chat_client=chat_client,
+        tools=[get_order_status],
+    )
+
 
 # Initialize the memory agent (summariser + embedder) — must be after chat_client
 memory_agent = MemoryAgent(chat_client=chat_client)
@@ -508,6 +537,25 @@ def _assert_session_owner(session_id: str, user_id: str) -> None:
 async def get_me(current_user: User = Depends(get_current_user)):
     """Return the currently authenticated user profile."""
     return current_user
+
+
+@app.get("/prompts/{prompt_name}")
+async def get_prompt(
+    prompt_name: str,
+    current_user: User = Depends(get_current_user),
+):
+    """Return the rendered system prompt for the given template name.
+
+    If the current user has a stored profile, the prompt is rendered with
+    personalised context injected.
+    """
+    template_file = f"{prompt_name}.j2"
+    user_profile = await profile_store.get_profile(current_user.user_id)
+    try:
+        rendered = load_prompt(template_file, user_profile=user_profile)
+    except jinja2.TemplateNotFound:
+        raise HTTPException(status_code=404, detail=f"Prompt '{prompt_name}' not found")
+    return {"name": prompt_name, "content": rendered}
 
 
 # Request/Response Models
@@ -1208,6 +1256,7 @@ async def stream_agent_response(
     thread: AgentThread,
     session_id: str,
     user_id: str,
+    personalized_agent: ChatAgent | None = None,
 ) -> AsyncIterator[str]:
     """
     Stream agent response using AG-UI protocol.
@@ -1232,8 +1281,10 @@ async def stream_agent_response(
         seen_tools: set[str] = set()
         full_response_text: list[str] = []  # accumulate text deltas
         
+        # Use personalized agent if available, otherwise fall back to default
+        active_agent = personalized_agent or agent
         # Stream agent response - framework handles history automatically
-        async for update in agent.run_stream(user_message, thread=thread):
+        async for update in active_agent.run_stream(user_message, thread=thread):
             # Emit text content
             if update.text:
                 full_response_text.append(update.text)
@@ -1351,9 +1402,13 @@ async def chat(
     
     if not user_message:
         raise HTTPException(status_code=400, detail="No user message provided")
-    
+
+    # Fetch user profile to personalise the agent's system prompt
+    user_profile = await profile_store.get_profile(current_user.user_id)
+    personalized = _build_personalized_agent(user_profile)
+
     return StreamingResponse(
-        stream_agent_response(user_message, thread, session_id, current_user.user_id),
+        stream_agent_response(user_message, thread, session_id, current_user.user_id, personalized),
         media_type="text/event-stream",
         headers={
             "Cache-Control": "no-cache",
