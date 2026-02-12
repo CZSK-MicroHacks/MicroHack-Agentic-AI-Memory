@@ -13,6 +13,7 @@ Architecture:
 - Custom AG-UI endpoint: Integrates session management with streaming responses
 """
 
+import contextvars
 import json
 import logging
 import os
@@ -391,6 +392,9 @@ profile_store = UserProfileMemoryStore()
 # Tools
 # =============================================================================
 
+# ContextVar to propagate the current user_id into @tool functions
+_current_user_id: contextvars.ContextVar[str] = contextvars.ContextVar("_current_user_id")
+
 # Status → Material Symbol icon name mapping
 _STATUS_ICONS = {
     "shipped": "local_shipping",
@@ -398,6 +402,38 @@ _STATUS_ICONS = {
     "delivered": "check_circle",
     "not_found": "error",
 }
+
+
+@tool
+async def check_memory(
+    query: Annotated[str, Field(description="Natural-language query to search past conversations")],
+) -> str:
+    """Search the user's conversation memory for relevant past conversations.
+
+    Use this tool when the user explicitly references or asks about something
+    from a previous conversation. Returns the top 3 most relevant conversation
+    summaries based on semantic similarity.
+    """
+    user_id = _current_user_id.get()
+    logger.info("Running check_memory tool with query: %s for user: %s", query, user_id)
+    query_embedding = await memory_agent._embed(query)
+
+    rows = await memory_store.search(
+        user_id=user_id,
+        query_embedding=query_embedding,
+        limit=3,
+    )
+
+    if not rows:
+        logger.info("No relevant past conversations found for query: %s", query)
+        return "No relevant past conversations found."
+    
+    logger.info("Found %d relevant conversations for query: %s", len(rows), query)
+    results = []
+    for i, row in enumerate(rows, 1):
+        results.append(f"{i}. {row['summary']}")
+
+    return "\n".join(results)
 
 
 @tool
@@ -448,7 +484,7 @@ agent = ChatAgent(
     name="CustomerSupportAgent",
     instructions=CUSTOMER_SUPPORT_PROMPT,
     chat_client=chat_client,
-    tools=[get_order_status],
+    tools=[get_order_status, check_memory],
 )
 
 
@@ -466,7 +502,7 @@ def _build_personalized_agent(user_profile: dict[str, Any] | None) -> ChatAgent:
         name="CustomerSupportAgent",
         instructions=personalized_prompt,
         chat_client=chat_client,
-        tools=[get_order_status],
+        tools=[get_order_status, check_memory],
     )
 
 
@@ -1271,7 +1307,10 @@ async def stream_agent_response(
     message_id = str(uuid.uuid4())  # Message ID for text content events
     
     logger.info("[IN] session=%s run=%s user_message=%s", session_id, run_id, user_message)
-    
+
+    # Set the current user_id so @tool functions can access it
+    _current_user_id.set(user_id)
+
     # Emit RUN_STARTED with thread/session ID
     logger.info("[OUT] session=%s run=%s event=RUN_STARTED", session_id, run_id)
     yield encoder.encode(RunStartedEvent(thread_id=session_id, run_id=run_id))
