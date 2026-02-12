@@ -1,0 +1,20 @@
+{
+  "name": "frontenda2uinative",
+  "private": true,
+  "version": "0.1.0",
+  "description": "A2UI Native Rendering frontend - renders agent responses using A2UI protocol components",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "lit": "^3.2.1",
+    "marked": "^17.0.1"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.2",
+    "vite": "^6.0.7"
+  }
+}

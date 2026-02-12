@@ -1,0 +1,16 @@
+server {
+    listen 8080;
+    root /usr/share/nginx/html;
+    index index.html;
+
+    # Inject runtime config as a JavaScript file
+    location = /config.js {
+        default_type application/javascript;
+        return 200 'window.__APP_CONFIG__={apiBaseUrl:"${BACKEND_URL}"};';
+    }
+
+    # SPA fallback
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+}

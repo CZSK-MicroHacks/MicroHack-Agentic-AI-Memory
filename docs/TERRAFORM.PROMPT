@@ -1,0 +1,61 @@
+Create infrastructure in Azure for this project by generating the entire infra folder from scratch. The goal is that running this prompt in a repo with no infra folder creates a complete, working Terraform implementation identical in scope and behavior to the current infra in this project.
+
+Basic principles:
+
+- Use Terraform only. All Terraform lives in the infra folder.
+- Use Azure and follow best practices.
+- IaaC and app deployment are separate. Container Apps should run hello-world images in Terraform.
+- Use user-assigned managed identities for app access to services.
+
+Deliverable requirements (must create all files):
+
+- Create infra/ with the full Terraform set: main.tf, variables.tf, outputs.tf, aca.tf, acr.tf, cosmosdb.tf, postgres.tf, redis.tf, identity.tf, roles.tf, monitoring.tf, openai.tf.
+- Include terraform.tfvars with sample values (do not hardcode secrets inside .tf files). Use placeholders for secrets if needed.
+- Use the same resource names, settings, and dependencies as described below.
+
+Architecture and services (must match current Terraform):
+
+- Azure Container Apps environment.
+- Container App: backend (hello-world image, ingress on port 8000).
+- Container App: frontend (hello-world image, ingress on port 8080).
+- Azure Container Registry (used by Container Apps with managed identity).
+- Log Analytics Workspace + Application Insights.
+- Azure AI Foundry (AIServices) account + project + model deployments (gpt-4o-mini, text-embedding-3-large).
+- Cosmos DB SQL API account, database ag-ui-db, containers: conversations, user_profiles, conversationhistory.
+- PostgreSQL Flexible Server (AAD + password auth enabled), database appdb, pgvector extension.
+- Azure Cache for Redis.
+- Role assignments:
+	- Cosmos DB Built-in Data Contributor for the app managed identity.
+	- AcrPull for ACR access.
+	- Azure AI User for AI Foundry access.
+
+Required settings (align with infra variables):
+
+- Resource group name: rg-mh-ai-memory (default in variables.tf).
+- Region: eastus2 (default in variables.tf).
+- Postgres location is allowed to differ; default is westus2, current terraform.tfvars uses northcentralus.
+- Project name default: mhaimem.
+- Use terraform.tfvars for subscription_id and secrets (do not hardcode in .tf files).
+
+Terraform provider requirements (must match):
+
+- Terraform >= 1.5.0.
+- Providers: azurerm (~>4.0), azuread (~>3.0), azapi (~>2.0).
+
+Reproducible execution steps:
+
+1) From infra, run terraform init, validate, and plan using terraform.tfvars.
+2) Apply the plan and wait for completion.
+3) Verify outputs from outputs.tf, at minimum:
+	 - backend_fqdn, frontend_fqdn
+	 - cosmosdb_endpoint, postgres_fqdn, redis_hostname
+	 - ai_foundry_endpoint, openai_chat_deployment, openai_embedding_deployment
+4) Confirm both Container Apps are running and reachable via their FQDNs.
+
+Notes and constraints:
+
+- Keep image references in Terraform as hello-world only (ignore changes for image in ACA).
+- Use the single user-assigned managed identity for Container Apps and data plane access.
+- Do not change resource names or variables unless strictly necessary for deployment.
+
+Do not finish until Terraform apply succeeds and both backend and frontend Container Apps are running in Azure.

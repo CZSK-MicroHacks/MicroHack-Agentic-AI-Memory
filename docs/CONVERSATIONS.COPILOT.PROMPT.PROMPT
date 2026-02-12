@@ -1,0 +1,26 @@
+Let's update backend. We are going to distinguish between session (contains live session, i.e. messages for particular session thread and this is stored in redis - current implementation) and conversation history.
+
+Conversation history holds all the user conversation in a form of JSON with all metadata needed in CosmosDB object database. Every conversation has ID key (probably threadid or our session id) to be uniquely identifiable for each user.
+
+For dev purposes we will use locall a CosmosDB emulator - image is already available:
+
+Run Cosmos DB Emulator in Docker (Linux)
+docker run
+--name cosmos-emulator
+--detach
+--publish 8081:8081
+--publish 1234:1234
+mcr.microsoft.com/cosmosdb/linux/azure-cosmos-emulator:vnext-preview
+
+Let's add these vars to env:
+
+Environment variables for Cosmos
+COSMOS_ENDPOINT=http://localhost:8081/
+COSMOS_KEY=C2y6yDjf5/R+ob0N8A7Cgv30VRDJIWEHLM+4QDU5DE2nQ9nDuVTqobD4b8mGGyPMbIZnqyMsEcaGQy67XIw/Jw==
+COSMOS_DATABASE_NAME=conversationhistory
+COSMOS_CONTAINER_NAME=conversationhistory
+
+Temporary: disable SSL verification for local Cosmos DB Emulator (remove when cert trusted)
+COSMOS_EMULATOR_DISABLE_SSL_VERIFY=1
+
+Let's create plan and design first, no coding now.

@@ -1,0 +1,9 @@
+Let's create another feature to our project - Conversation Memory. The Conversation memory is storing individual Conversation History items in a more efficient way, essentially, it gets the Conversation History item and summarizes the message in a meaningfull way. So for each Conversation History item exist one Conversation memory item, simply representing summary of the conversation history item.
+
+The actual create step for conversation memory happens usually once a day is considered a background process. For our project we will add a user-requested creation of conversation memory: on each Conversation History item displayed in frontend will be a button (similar to current rename and delete) which will kick off the background API for creation of conversation memory.
+
+The backend should contain conversation memory APIS - creation, list, delete - basic CRUD. The creation should be done by simple custom agent (agent framework) with a summarization prompt and vectorization step (embedding model). The conversation memory is stored in pgsql (running locally in docker - see #pgsql folder with pgvector extension).
+
+The backend should also implement API which will do vector search over the database based on input text. The search returns top 10 rows.
+
+Create a carefull design for this feature only, no code yet.

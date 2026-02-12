@@ -1,0 +1,271 @@
+#!/usr/bin/env bash
+# =============================================================================
+# deploy.sh – Build & deploy backend + frontend to Azure Container Apps
+#
+# Usage:
+#   ./setup/deploy.sh               # deploy both
+#   ./setup/deploy.sh backend       # deploy backend only
+#   ./setup/deploy.sh frontend      # deploy frontend only
+#
+# Prerequisites:
+#   - az CLI logged in
+#   - Terraform infrastructure already provisioned (infra/)
+# =============================================================================
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+
+# ── Configuration (derived from Terraform outputs) ──────────────────────────
+RESOURCE_GROUP="rg-mh-ai-memory"
+PROJECT_NAME="mhaimem"
+SUBSCRIPTION_ID="de281c5e-5d60-4fc1-b905-c91caf45e624"
+
+# Ensure correct subscription
+az account set -s "$SUBSCRIPTION_ID"
+
+BACKEND_APP="ca-backend-${PROJECT_NAME}"
+FRONTEND_APP="ca-frontend-${PROJECT_NAME}"
+
+# ACR – auto-detect from resource group
+ACR_LOGIN_SERVER=$(az acr list -g "$RESOURCE_GROUP" --query "[0].loginServer" -o tsv)
+ACR_NAME=$(az acr list -g "$RESOURCE_GROUP" --query "[0].name" -o tsv)
+
+if [[ -z "$ACR_LOGIN_SERVER" ]]; then
+  echo "❌ No ACR found in resource group $RESOURCE_GROUP"
+  exit 1
+fi
+
+# Managed Identity
+IDENTITY_CLIENT_ID=$(az identity show -n "id-${PROJECT_NAME}" -g "$RESOURCE_GROUP" --query clientId -o tsv)
+IDENTITY_RESOURCE_ID=$(az identity show -n "id-${PROJECT_NAME}" -g "$RESOURCE_GROUP" --query id -o tsv)
+
+# Image tags – use git short hash or timestamp
+TAG="${DEPLOY_TAG:-$(git -C "$PROJECT_ROOT" rev-parse --short HEAD 2>/dev/null || date +%Y%m%d%H%M%S)}"
+
+# ── Service endpoints (from Terraform-provisioned resources) ────────────────
+COSMOS_ENDPOINT=$(az cosmosdb show -n "cosmos-${PROJECT_NAME}" -g "$RESOURCE_GROUP" --query documentEndpoint -o tsv)
+PG_FQDN=$(az postgres flexible-server show -n "pgflex-${PROJECT_NAME}" -g "$RESOURCE_GROUP" --query fullyQualifiedDomainName -o tsv)
+BACKEND_FQDN=$(az containerapp show -n "$BACKEND_APP" -g "$RESOURCE_GROUP" --query "properties.configuration.ingress.fqdn" -o tsv)
+OPENAI_ENDPOINT=$(az cognitiveservices account show -n "aifoundry-${PROJECT_NAME}" -g "$RESOURCE_GROUP" --query "properties.endpoint" -o tsv)
+
+# ── Helpers ─────────────────────────────────────────────────────────────────
+log()  { echo "──▶ $*"; }
+ok()   { echo "  ✅ $*"; }
+fail() { echo "  ❌ $*"; exit 1; }
+
+acr_build() {
+  local image_name="$1"
+  local context_dir="$2"
+
+  log "Building ${image_name} in ACR (cloud build)…"
+  az acr build \
+    --registry "$ACR_NAME" \
+    --resource-group "$RESOURCE_GROUP" \
+    --image "$image_name" \
+    --platform linux/amd64 \
+    "$context_dir"
+  ok "Image built & pushed: ${image_name}"
+}
+
+ensure_registry_configured() {
+  local app_name="$1"
+  local has_registry
+  has_registry=$(az containerapp show -n "$app_name" -g "$RESOURCE_GROUP" \
+    --query "length(properties.configuration.registries[?server=='${ACR_LOGIN_SERVER}'])" -o tsv 2>/dev/null || echo "0")
+
+  if [[ "$has_registry" == "0" ]]; then
+    log "Configuring ACR registry on ${app_name}…"
+    az containerapp registry set -n "$app_name" -g "$RESOURCE_GROUP" \
+      --server "$ACR_LOGIN_SERVER" \
+      --identity "$IDENTITY_RESOURCE_ID"
+    ok "Registry configured"
+  else
+    ok "Registry already configured on ${app_name}"
+  fi
+}
+
+# ── Backend deploy ──────────────────────────────────────────────────────────
+deploy_backend() {
+  acr_build "${BACKEND_APP}:${TAG}" "$PROJECT_ROOT/backend"
+
+  ensure_registry_configured "$BACKEND_APP"
+
+  log "Updating container app ${BACKEND_APP}…"
+  az containerapp update -n "$BACKEND_APP" -g "$RESOURCE_GROUP" \
+    --image "${ACR_LOGIN_SERVER}/${BACKEND_APP}:${TAG}" \
+    --set-env-vars \
+      "AZURE_CLIENT_ID=${IDENTITY_CLIENT_ID}" \
+      "COSMOS_ENDPOINT=${COSMOS_ENDPOINT}" \
+      "COSMOS_DATABASE_NAME=ag-ui-db" \
+      "COSMOS_CONTAINER_NAME=conversations" \
+      "COSMOS_UPM_DATABASE_NAME=ag-ui-db" \
+      "COSMOS_UPM_CONTAINER_NAME=user_profiles" \
+      "PG_HOST=${PG_FQDN}" \
+      "PG_PORT=5432" \
+      "PG_DATABASE=appdb" \
+      "PG_USER=pgadmin" \
+      "PG_PASSWORD=P@ssw0rd2026!" \
+      "AZURE_OPENAI_ENDPOINT=${OPENAI_ENDPOINT}" \
+      "AZURE_OPENAI_DEPLOYMENT_NAME=gpt-4o-mini" \
+      "AZURE_OPENAI_EMBEDDING_DEPLOYMENT_NAME=text-embedding-3-large"
+  ok "Backend container app updated"
+
+  # Ensure ingress target port matches uvicorn
+  az containerapp ingress update -n "$BACKEND_APP" -g "$RESOURCE_GROUP" \
+    --target-port 8000 >/dev/null 2>&1
+  ok "Backend ingress target port set to 8000"
+
+  wait_for_revision "$BACKEND_APP"
+}
+
+# ── Frontend deploy ─────────────────────────────────────────────────────────
+deploy_frontend() {
+  acr_build "${FRONTEND_APP}:${TAG}" "$PROJECT_ROOT/frontend"
+
+  ensure_registry_configured "$FRONTEND_APP"
+
+  log "Updating container app ${FRONTEND_APP}…"
+  az containerapp update -n "$FRONTEND_APP" -g "$RESOURCE_GROUP" \
+    --image "${ACR_LOGIN_SERVER}/${FRONTEND_APP}:${TAG}" \
+    --set-env-vars \
+      "BACKEND_URL=https://${BACKEND_FQDN}"
+  ok "Frontend container app updated"
+
+  # Ensure ingress target port matches nginx
+  az containerapp ingress update -n "$FRONTEND_APP" -g "$RESOURCE_GROUP" \
+    --target-port 8080 >/dev/null 2>&1
+  ok "Frontend ingress target port set to 8080"
+
+  wait_for_revision "$FRONTEND_APP"
+}
+
+# ── Wait for healthy revision ──────────────────────────────────────────────
+wait_for_revision() {
+  local app_name="$1"
+  local max_wait=120
+  local elapsed=0
+
+  log "Waiting for ${app_name} to become healthy (max ${max_wait}s)…"
+
+  while [[ $elapsed -lt $max_wait ]]; do
+    local state
+    state=$(az containerapp show -n "$app_name" -g "$RESOURCE_GROUP" \
+      --query "properties.latestRevisionName" -o tsv)
+
+    local health running
+    health=$(az containerapp revision show -n "$app_name" -g "$RESOURCE_GROUP" \
+      --revision "$state" --query "properties.healthState" -o tsv 2>/dev/null || echo "Unknown")
+    running=$(az containerapp revision show -n "$app_name" -g "$RESOURCE_GROUP" \
+      --revision "$state" --query "properties.runningState" -o tsv 2>/dev/null || echo "Unknown")
+
+    if [[ "$health" == "Healthy" && "$running" != "Activating" ]]; then
+      ok "${app_name} revision ${state} is Healthy / ${running}"
+      return 0
+    fi
+
+    echo "    ⏳ ${state}: health=${health} running=${running} (${elapsed}s)"
+    sleep 10
+    elapsed=$((elapsed + 10))
+  done
+
+  echo "  ⚠️  Timeout waiting for ${app_name}. Fetching logs…"
+  az containerapp logs show -n "$app_name" -g "$RESOURCE_GROUP" --tail 20
+  return 1
+}
+
+# ── Smoke test ──────────────────────────────────────────────────────────────
+smoke_test() {
+  log "Running smoke tests…"
+  local failures=0
+
+  # Backend /me
+  local backend_url="https://${BACKEND_FQDN}"
+  local status
+  status=$(curl -s -o /dev/null -w "%{http_code}" "${backend_url}/me" -H "X-User-Id: user-alice" 2>/dev/null || echo "000")
+  if [[ "$status" == "200" ]]; then
+    ok "Backend /me → 200"
+  else
+    echo "  ⚠️  Backend /me → ${status}"
+    failures=$((failures + 1))
+  fi
+
+  # Frontend index
+  local frontend_fqdn
+  frontend_fqdn=$(az containerapp show -n "$FRONTEND_APP" -g "$RESOURCE_GROUP" \
+    --query "properties.configuration.ingress.fqdn" -o tsv)
+  status=$(curl -s -o /dev/null -w "%{http_code}" "https://${frontend_fqdn}/" 2>/dev/null || echo "000")
+  if [[ "$status" == "200" ]]; then
+    ok "Frontend / → 200"
+  else
+    echo "  ⚠️  Frontend / → ${status}"
+    failures=$((failures + 1))
+  fi
+
+  # Frontend config.js
+  local config_body
+  config_body=$(curl -s "https://${frontend_fqdn}/config.js" 2>/dev/null)
+  if echo "$config_body" | grep -q "apiBaseUrl"; then
+    ok "Frontend /config.js contains apiBaseUrl"
+  else
+    echo "  ⚠️  Frontend /config.js missing apiBaseUrl"
+    failures=$((failures + 1))
+  fi
+
+  # CORS preflight
+  status=$(curl -s -o /dev/null -w "%{http_code}" -X OPTIONS "${backend_url}/me" \
+    -H "Origin: https://${frontend_fqdn}" \
+    -H "Access-Control-Request-Method: GET" \
+    -H "Access-Control-Request-Headers: X-User-Id" 2>/dev/null || echo "000")
+  if [[ "$status" == "200" ]]; then
+    ok "CORS preflight → 200"
+  else
+    echo "  ⚠️  CORS preflight → ${status}"
+    failures=$((failures + 1))
+  fi
+
+  echo ""
+  if [[ $failures -eq 0 ]]; then
+    echo "  ✅ All smoke tests successful!"
+  else
+    echo "  ⚠️  ${failures} smoke test(s) failed"
+  fi
+  echo "  Frontend: https://${frontend_fqdn}"
+  echo "  Backend:  ${backend_url}"
+}
+
+# ── Main ────────────────────────────────────────────────────────────────────
+main() {
+  local target="${1:-all}"
+
+  echo "╔══════════════════════════════════════════════════════════════╗"
+  echo "║  AG-UI Demo – Azure Container Apps Deploy                  ║"
+  echo "║  Tag: ${TAG}                                       ║"
+  echo "╚══════════════════════════════════════════════════════════════╝"
+  echo ""
+
+  case "$target" in
+    backend)
+      deploy_backend
+      smoke_test
+      ;;
+    frontend)
+      deploy_frontend
+      smoke_test
+      ;;
+    all)
+      deploy_backend
+      deploy_frontend
+      smoke_test
+      ;;
+    test)
+      smoke_test
+      ;;
+    *)
+      echo "Usage: $0 [backend|frontend|all|test]"
+      exit 1
+      ;;
+  esac
+}
+
+main "$@"

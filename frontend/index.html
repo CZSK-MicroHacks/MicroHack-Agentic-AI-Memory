@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>A2UI Native – Customer Support</title>
+
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&icon_names=account_circle,add,arrow_back,arrow_forward,auto_awesome,chat,chat_bubble,check,check_circle,circle,close,dark_mode,delete,edit,error,expand_less,expand_more,help,history,info,inventory_2,light_mode,local_shipping,menu,more_vert,open_in_new,package_2,pending,person_add,person_off,psychology,psychology_alt,refresh,schedule,send,support_agent&display=swap"
+    />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@300..700&display=swap"
+      rel="stylesheet"
+    />
+
+    <style>
+      :root {
+        /* Neutral palette — tighter, more ChatGPT-like */
+        --n-100: #ffffff; --n-99: #fafafa; --n-98: #f7f7f8;
+        --n-95: #ececf1; --n-90: #d9d9e3; --n-80: #c5c5d2;
+        --n-70: #acacbe; --n-60: #8e8ea0; --n-50: #6e6e80;
+        --n-40: #565869; --n-35: #4e4f60; --n-30: #444654;
+        --n-25: #3a3b44; --n-20: #2d2d3a; --n-15: #212121;
+        --n-10: #171717; --n-5: #0d0d0d;  --n-0: #000000;
+
+        /* Primary palette — subtle, muted accent */
+        --p-100: #ffffff; --p-95: #f0f4ff; --p-90: #d8e2ff;
+        --p-80: #b0c4ff; --p-70: #89a7ff; --p-60: #6b8aed;
+        --p-50: #5570d4; --p-40: #4159b8; --p-35: #374eaa;
+        --p-30: #2d419c; --p-20: #1e2d7a; --p-10: #0f1a5c;
+
+        /* Error palette */
+        --e-95: #ffedea; --e-90: #ffdad6; --e-80: #ffb4ab;
+        --e-60: #ff5449; --e-40: #ba1a1a;
+
+        /* Status colours */
+        --status-shipped: #2563eb;    --status-shipped-bg: #dbeafe;
+        --status-processing: #d97706; --status-processing-bg: #fef3c7;
+        --status-delivered: #16a34a;  --status-delivered-bg: #dcfce7;
+        --status-not-found: #dc2626; --status-not-found-bg: #fee2e2;
+
+        --font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        --bb-grid-size: 4px;
+      }
+
+      *, *::before, *::after { box-sizing: border-box; }
+
+      html, body {
+        font-family: var(--font-family);
+        background: light-dark(var(--n-100), var(--n-15));
+        margin: 0; padding: 0;
+        width: 100svw; height: 100svh;
+        overflow: auto;
+        --color-scheme: light;
+        color-scheme: var(--color-scheme);
+      }
+
+      body.light { --color-scheme: light; }
+      body.dark  { --color-scheme: dark;  }
+
+      @media (prefers-color-scheme: dark) {
+        html, body { --color-scheme: dark; }
+      }
+    </style>
+  </head>
+  <body>
+    <a2ui-native-app></a2ui-native-app>
+    <!-- Runtime config injected by nginx in production (ignored in dev) -->
+    <script src="/config.js" onerror=""></script>
+    <script type="module" src="./src/main.ts"></script>
+  </body>
+</html>
