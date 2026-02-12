@@ -43,8 +43,8 @@ This MicroHack consists of progressive challenges to build your expertise:
 | 07 | **Knowledge Graph** | Graph-based agentic search, GraphRAG, PostgreSQL AGE/SQL (optional, advanced) | 90 min |
 
 ## TODOs
-- [ ] Master prompt to JINJA
-- [ ] Apply Profile to Master prompt
+- [x] Master prompt to JINJA
+- [x] Apply Profile to Master prompt
 - [ ] Add tool to update Profile
 - [ ] Add tool to retrieve from conversaton memory and inject to prompt
 - [ ] convert tools to MCP
