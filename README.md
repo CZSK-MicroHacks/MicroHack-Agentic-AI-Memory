@@ -46,7 +46,7 @@ This MicroHack consists of progressive challenges to build your expertise:
 - [x] Master prompt to JINJA
 - [x] Apply Profile to Master prompt
 - [ ] Add tool to update Profile
-- [ ] Add tool to retrieve from conversaton memory and inject to prompt
+- [x] Add tool to retrieve from conversaton memory and inject to prompt
 - [ ] convert tools to MCP
 
 

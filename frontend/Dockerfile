@@ -28,6 +28,7 @@ RUN rm -f /etc/nginx/conf.d/default.conf
 
 # Default backend URL (override via env var in ACA)
 ENV BACKEND_URL=http://localhost:8000
+ENV BUILD_ID=
 
 EXPOSE 8080
 

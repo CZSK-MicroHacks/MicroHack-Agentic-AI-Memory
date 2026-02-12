@@ -6,7 +6,7 @@ server {
     # Inject runtime config as a JavaScript file
     location = /config.js {
         default_type application/javascript;
-        return 200 'window.__APP_CONFIG__={apiBaseUrl:"${BACKEND_URL}"};';
+        return 200 'window.__APP_CONFIG__={apiBaseUrl:"${BACKEND_URL}",buildId:"${BUILD_ID}"};';
     }
 
     # SPA fallback

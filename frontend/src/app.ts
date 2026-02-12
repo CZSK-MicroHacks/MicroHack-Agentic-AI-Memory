@@ -72,6 +72,8 @@ export class NativeApp extends LitElement {
   @state() private promptLoading = false;
   @state() private promptCopied = false;
 
+  private buildId = ((window as any).__APP_CONFIG__?.buildId ?? '').trim();
+
   @query('.messages-area')
   private messagesArea!: HTMLElement;
 
@@ -308,6 +310,29 @@ export class NativeApp extends LitElement {
       overflow: hidden;
       text-overflow: ellipsis;
       color: light-dark(var(--n-10), var(--n-90));
+    }
+    .user-meta {
+      display: flex;
+      flex-direction: column;
+      min-width: 0;
+      flex: 1;
+    }
+    .build-id {
+      font-size: 11px;
+      color: light-dark(var(--n-60), var(--n-50));
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      margin-top: 1px;
+    }
+    .sidebar-build-id {
+      padding: 6px 16px 10px;
+      font-size: 11px;
+      color: light-dark(var(--n-60), var(--n-50));
+      border-top: 1px solid light-dark(var(--n-95), var(--n-25));
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
     }
 
     /* ── Main area ──────────────────────────────────────── */
@@ -1928,12 +1953,18 @@ export class NativeApp extends LitElement {
           ? html`
             <div class="user-card" @click=${this.toggleProfileDrawer}>
               <div class="user-avatar">${this.currentUser.initials}</div>
-              <div class="user-name">${this.currentUser.display_name}</div>
+              <div class="user-meta">
+                <div class="user-name">${this.currentUser.display_name}</div>
+                ${this.buildId ? html`<div class="build-id">Build ${this.buildId}</div>` : nothing}
+              </div>
               <span class="material-symbols-outlined" style="font-size:16px; margin-left:auto; color: light-dark(var(--n-60), var(--n-50))">
                 ${this.profileDrawerOpen ? 'expand_more' : 'expand_less'}
               </span>
             </div>
           `
+          : nothing}
+        ${!this.currentUser && this.buildId
+          ? html`<div class="sidebar-build-id">Build ${this.buildId}</div>`
           : nothing}
       </aside>
       ${this.profileToast

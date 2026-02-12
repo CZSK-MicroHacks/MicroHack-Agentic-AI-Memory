@@ -42,6 +42,7 @@ IDENTITY_RESOURCE_ID=$(az identity show -n "id-${PROJECT_NAME}" -g "$RESOURCE_GR
 
 # Image tags – use git short hash or timestamp
 TAG="${DEPLOY_TAG:-$(git -C "$PROJECT_ROOT" rev-parse --short HEAD 2>/dev/null || date +%Y%m%d%H%M%S)}"
+BUILD_ID="${DEPLOY_BUILD_ID:-$(git -C "$PROJECT_ROOT" rev-parse HEAD 2>/dev/null || echo "")}"
 
 # ── Service endpoints (from Terraform-provisioned resources) ────────────────
 COSMOS_ENDPOINT=$(az cosmosdb show -n "cosmos-${PROJECT_NAME}" -g "$RESOURCE_GROUP" --query documentEndpoint -o tsv)
@@ -129,7 +130,8 @@ deploy_frontend() {
   az containerapp update -n "$FRONTEND_APP" -g "$RESOURCE_GROUP" \
     --image "${ACR_LOGIN_SERVER}/${FRONTEND_APP}:${TAG}" \
     --set-env-vars \
-      "BACKEND_URL=https://${BACKEND_FQDN}"
+      "BACKEND_URL=https://${BACKEND_FQDN}" \
+      "BUILD_ID=${BUILD_ID}"
   ok "Frontend container app updated"
 
   # Ensure ingress target port matches nginx
