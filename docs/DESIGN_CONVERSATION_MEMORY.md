@@ -238,7 +238,7 @@ dependencies = [
 
 ## 4. API Design
 
-All endpoints are scoped to the authenticated user (via `X-User-ID` header, same as existing endpoints).
+All endpoints are scoped to the authenticated user (via `Authorization: Bearer ...` in cloud deployments; local mock mode uses explicit `X-Mock-User-ID`).
 
 ### 4.1 Create Memory
 

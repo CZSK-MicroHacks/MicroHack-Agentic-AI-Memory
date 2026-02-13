@@ -36,6 +36,39 @@ variable "tags" {
 }
 
 # -----------------------------------------------------------------------------
+# Entra ID Authentication
+# -----------------------------------------------------------------------------
+
+variable "auth_mode" {
+  description = "Authentication mode for deployed applications (entra or mock)."
+  type        = string
+  default     = "entra"
+
+  validation {
+    condition     = contains(["entra", "mock"], lower(var.auth_mode))
+    error_message = "auth_mode must be either 'entra' or 'mock'."
+  }
+}
+
+variable "frontend_additional_redirect_uris" {
+  description = "Additional redirect URIs for the frontend SPA app registration."
+  type        = list(string)
+  default     = []
+}
+
+variable "frontend_redirect_uri" {
+  description = "Primary frontend redirect URI for Entra SPA registration (e.g. ACA frontend FQDN)."
+  type        = string
+  default     = ""
+}
+
+variable "frontend_additional_post_logout_redirect_uris" {
+  description = "Additional post-logout redirect URIs for the frontend SPA app registration."
+  type        = list(string)
+  default     = []
+}
+
+# -----------------------------------------------------------------------------
 # PostgreSQL
 # -----------------------------------------------------------------------------
 

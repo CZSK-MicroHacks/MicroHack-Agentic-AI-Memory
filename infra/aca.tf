@@ -83,6 +83,24 @@ resource "azurerm_container_app" "backend" {
         value = azurerm_user_assigned_identity.app.client_id
       }
 
+      # App authentication
+      env {
+        name  = "AUTH_MODE"
+        value = lower(var.auth_mode)
+      }
+      env {
+        name  = "ENTRA_TENANT_ID"
+        value = data.azuread_client_config.current.tenant_id
+      }
+      env {
+        name  = "ENTRA_AUDIENCE"
+        value = azuread_application.backend_api.client_id
+      }
+      env {
+        name  = "ENTRA_REQUIRED_SCOPES"
+        value = "access_as_user"
+      }
+
       # PostgreSQL
       env {
         name  = "PG_HOST"
@@ -160,6 +178,22 @@ resource "azurerm_container_app" "frontend" {
       env {
         name  = "BACKEND_URL"
         value = "https://${azurerm_container_app.backend.ingress[0].fqdn}"
+      }
+      env {
+        name  = "AUTH_MODE"
+        value = lower(var.auth_mode)
+      }
+      env {
+        name  = "ENTRA_TENANT_ID"
+        value = data.azuread_client_config.current.tenant_id
+      }
+      env {
+        name  = "ENTRA_CLIENT_ID"
+        value = azuread_application.frontend_spa.client_id
+      }
+      env {
+        name  = "ENTRA_API_SCOPE"
+        value = "${one(azuread_application.backend_api.identifier_uris)}/access_as_user"
       }
     }
   }

@@ -10,6 +10,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@azure/msal-browser": "^4.14.1",
     "dompurify": "^3.3.1",
     "lit": "^3.2.1",
     "marked": "^17.0.1"

@@ -324,7 +324,7 @@ No new dependencies — reuses `azure-cosmos` already in `pyproject.toml`.
 
 ## 5. API Design
 
-All endpoints scoped to the authenticated user via `X-User-ID` header.
+All endpoints are scoped to the authenticated user via bearer token identity (`Authorization: Bearer ...`) in cloud deployments; local development may use explicit `X-Mock-User-ID` in mock mode.
 
 ### 5.1 Get Profile
 

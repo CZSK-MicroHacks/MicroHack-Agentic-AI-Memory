@@ -11,7 +11,8 @@ history, and persists conversations, memories, and user profiles.
 - Durable conversation history in Azure Cosmos DB
 - Conversation memory summaries + vector search (PostgreSQL + pgvector)
 - User profile memory extraction and CRUD (Cosmos DB)
-- Mock auth via `X-User-ID` header
+- Azure Entra ID bearer token auth (production)
+- Explicit mock auth via `X-Mock-User-ID` (local development)
 
 ## Architecture
 
@@ -44,7 +45,7 @@ history, and persists conversations, memories, and user profiles.
 | `user_profile_memory.py` | Cosmos DB user profile store |
 | `memory_agent.py` | Conversation summarizer + embedding |
 | `profile_agent.py` | User profile extraction agent |
-| `auth.py` | Mock auth (`X-User-ID`) |
+| `auth.py` | Entra JWT auth + local mock auth |
 | `client.py` | CLI test client for AG-UI streaming |
 
 ## Running
@@ -85,10 +86,19 @@ Optional (memory + profile):
 - `PG_SSLMODE` (optional override; default is `require` for `managed_identity`, `prefer` for `password`)
 - `AGUI_SERVER_URL` (for `client.py`)
 
+Auth configuration:
+
+- `AUTH_MODE` (`entra` or `mock`, default `entra`)
+- `ENTRA_TENANT_ID` (required in `entra` mode)
+- `ENTRA_AUDIENCE` (required in `entra` mode; backend API client ID)
+- `ENTRA_ISSUER` (optional override)
+- `ENTRA_REQUIRED_SCOPES` (optional comma-separated scopes)
+- `ENTRA_REQUIRED_ROLES` (optional comma-separated app roles)
+
 ## Core endpoints
 
 - `POST /chat` — SSE stream of AG-UI events
-- `GET /me` — current user (mock auth)
+- `GET /me` — current authenticated user
 - `POST /sessions` / `GET /sessions` / `DELETE /sessions/{id}`
 - `GET /conversations` / `GET /conversations/{id}`
 - `POST /memories` / `POST /memories/search`
