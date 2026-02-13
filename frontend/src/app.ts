@@ -16,6 +16,7 @@ import { AGUIClient, type SessionInfo, type ConversationSummary, type MemorySumm
 import type { User } from './auth.js';
 import { A2UIProcessor, type SurfaceState } from './a2ui/processor.js';
 import { convertToolResult, convertGenericResult } from './converters.js';
+import { uiLogger, type UiErrorEvent } from './ui-logger.js';
 
 // Register the surface renderer custom element
 import './a2ui/surface-renderer.js';
@@ -1225,6 +1226,16 @@ export class NativeApp extends LitElement {
 
   connectedCallback() {
     super.connectedCallback();
+
+    const maybeTelemetryReporter = (window as any).__APP_TELEMETRY__?.trackError;
+    uiLogger.configure({
+      notifyUser: (message) => this.showProfileToast(message),
+      reportTelemetry:
+        typeof maybeTelemetryReporter === 'function'
+          ? (event: UiErrorEvent) => maybeTelemetryReporter(event)
+          : undefined,
+    });
+
     this.updateComplete.then(() => this.inputEl?.focus());
     this.fetchCurrentUser();
     this.refreshSessions();
@@ -1239,7 +1250,7 @@ export class NativeApp extends LitElement {
     try {
       this.currentUser = await this.client.getMe();
     } catch (err) {
-      console.error('Failed to fetch current user:', err);
+      uiLogger.error('user.fetch-current', err);
     }
   }
 
@@ -1295,7 +1306,7 @@ export class NativeApp extends LitElement {
     try {
       this.sessions = await this.client.listSessions();
     } catch (err) {
-      console.error('Failed to load sessions:', err);
+      uiLogger.error('sessions.list', err);
     }
   }
 
@@ -1307,7 +1318,7 @@ export class NativeApp extends LitElement {
       await this.refreshSessions();
       this.updateComplete.then(() => this.inputEl?.focus());
     } catch (err) {
-      console.error('Failed to create session:', err);
+      uiLogger.error('sessions.create', err, 'Unable to create a new chat right now.');
     }
   }
 
@@ -1322,7 +1333,7 @@ export class NativeApp extends LitElement {
       this.messages = this.buildChatMessagesFromHistory(history);
       this.scrollToBottom();
     } catch (err) {
-      console.error('Failed to load history:', err);
+      uiLogger.error('sessions.history', err, 'Unable to load this session history.');
     }
     this.updateComplete.then(() => this.inputEl?.focus());
   }
@@ -1420,7 +1431,7 @@ export class NativeApp extends LitElement {
         await this.client.updateSession(this.editingSessionId, title);
         await this.refreshSessions();
       } catch (err) {
-        console.error('Failed to rename:', err);
+        uiLogger.error('sessions.rename', err, 'Unable to rename this session.');
       }
     }
     this.editingSessionId = null;
@@ -1447,7 +1458,7 @@ export class NativeApp extends LitElement {
       }
       await this.refreshSessions();
     } catch (err) {
-      console.error('Failed to delete:', err);
+      uiLogger.error('sessions.delete', err, 'Unable to delete this session.');
     }
   }
 
@@ -1464,7 +1475,7 @@ export class NativeApp extends LitElement {
     try {
       this.conversations = await this.client.listConversations();
     } catch (err) {
-      console.error('Failed to load conversations:', err);
+      uiLogger.error('conversations.list', err);
     }
   }
 
@@ -1480,7 +1491,7 @@ export class NativeApp extends LitElement {
       this.messages = msgs;
       this.scrollToBottom();
     } catch (err) {
-      console.error('Failed to load conversation:', err);
+      uiLogger.error('conversations.get', err, 'Unable to load this conversation.');
     }
     this.updateComplete.then(() => this.inputEl?.focus());
   }
@@ -1511,7 +1522,7 @@ export class NativeApp extends LitElement {
         await this.client.updateConversation(this.editingConversationId, title);
         await this.refreshConversations();
       } catch (err) {
-        console.error('Failed to rename conversation:', err);
+        uiLogger.error('conversations.rename', err, 'Unable to rename this conversation.');
       }
     }
     this.editingConversationId = null;
@@ -1541,7 +1552,7 @@ export class NativeApp extends LitElement {
       this.memorizedConversationIds = new Set(this.memorizedConversationIds);
       await this.refreshConversations();
     } catch (err) {
-      console.error('Failed to delete conversation:', err);
+      uiLogger.error('conversations.delete', err, 'Unable to delete this conversation.');
     }
   }
 
@@ -1552,7 +1563,7 @@ export class NativeApp extends LitElement {
       this.memories = await this.client.listMemories();
       this.memorizedConversationIds = new Set(this.memories.map(m => m.conversation_id));
     } catch (err) {
-      console.error('Failed to load memories:', err);
+      uiLogger.error('memories.list', err);
     }
   }
 
@@ -1567,7 +1578,7 @@ export class NativeApp extends LitElement {
       await this.client.createMemory(conversationId);
       await this.refreshMemories();
     } catch (err) {
-      console.error('Failed to memorize conversation:', err);
+      uiLogger.error('memories.create', err, 'Unable to memorize this conversation right now.');
     } finally {
       this.memorizingConversationId = null;
     }
@@ -1588,7 +1599,7 @@ export class NativeApp extends LitElement {
       const result = await this.client.searchMemories(query, 10);
       this.memorySearchResults = result.results;
     } catch (err) {
-      console.error('Memory search failed:', err);
+      uiLogger.error('memories.search', err, 'Memory search failed. Please try again.');
       this.memorySearchResults = [];
     } finally {
       this.memorySearchLoading = false;
@@ -1638,7 +1649,7 @@ export class NativeApp extends LitElement {
       }
       await this.refreshMemories();
     } catch (err) {
-      console.error('Failed to delete memory:', err);
+      uiLogger.error('memories.delete', err, 'Unable to delete this memory.');
     }
   }
 
@@ -1648,7 +1659,7 @@ export class NativeApp extends LitElement {
     try {
       this.userProfile = await this.client.getProfile();
     } catch (err) {
-      console.error('Failed to fetch profile:', err);
+      uiLogger.error('profile.fetch', err);
     }
   }
 
@@ -1674,7 +1685,7 @@ export class NativeApp extends LitElement {
           : 'No new personal information found',
       );
     } catch (err) {
-      console.error('Failed to generate profile:', err);
+      uiLogger.error('profile.generate-all', err, 'Failed to generate profile');
       this.showProfileToast('Failed to generate profile');
     } finally {
       this.profileGenerating = false;
@@ -1694,7 +1705,7 @@ export class NativeApp extends LitElement {
           : 'No new personal info found',
       );
     } catch (err) {
-      console.error('Failed to generate profile:', err);
+      uiLogger.error('profile.generate', err, 'Failed to update profile');
       this.showProfileToast('Failed to update profile');
     } finally {
       this.profileGenerating = false;
@@ -1708,7 +1719,7 @@ export class NativeApp extends LitElement {
       this.profileDrawerOpen = false;
       this.showProfileToast('Profile deleted');
     } catch (err) {
-      console.error('Failed to delete profile:', err);
+      uiLogger.error('profile.delete', err, 'Failed to delete profile');
     }
   }
 
@@ -1726,7 +1737,7 @@ export class NativeApp extends LitElement {
         const data = await this.client.getPrompt('customer_support');
         this.promptContent = data.content;
       } catch (err) {
-        console.error('Failed to fetch prompt:', err);
+        uiLogger.error('prompt.fetch', err, 'Failed to load prompt.');
         this.promptContent = 'Failed to load prompt.';
       } finally {
         this.promptLoading = false;
@@ -1823,6 +1834,7 @@ export class NativeApp extends LitElement {
         },
 
         onError: (msg) => {
+          uiLogger.error('chat.stream', msg);
           updateAssistant({ content: `Error: ${msg}`, isStreaming: false });
         },
 
@@ -1836,7 +1848,7 @@ export class NativeApp extends LitElement {
       this.refreshSessions();
       this.refreshConversations();
     } catch (err) {
-      console.error(err);
+      uiLogger.error('chat.send', err);
       updateAssistant({ content: 'Sorry, an error occurred. Please try again.', isStreaming: false });
     } finally {
       this.isLoading = false;

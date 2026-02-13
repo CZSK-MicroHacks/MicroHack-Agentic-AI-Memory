@@ -15,6 +15,14 @@ A lightweight Lit (Web Components) app that **natively renders A2UI protocol com
 - Memory list + semantic search with detail view
 - User profile drawer with generate/update/delete
 
+## Error handling
+
+- Runtime UI errors are centralized through `src/ui-logger.ts` (`uiLogger.error(context, error, userMessage?)`).
+- User-facing failures use safe, generic messages (toast notifications) instead of exposing raw exception details.
+- In local development, structured errors are still visible in browser console for debugging.
+- Optional telemetry is supported by providing `window.__APP_TELEMETRY__.trackError(event)`.
+- Telemetry failures are swallowed so logging never breaks user flows.
+
 ## Architecture
 
 ```
