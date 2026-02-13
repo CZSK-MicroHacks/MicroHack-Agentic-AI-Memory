@@ -11,6 +11,7 @@ import { customElement, state, query } from 'lit/decorators.js';
 import { repeat } from 'lit/directives/repeat.js';
 import { unsafeHTML } from 'lit/directives/unsafe-html.js';
 import { marked } from 'marked';
+import DOMPurify from 'dompurify';
 import { AGUIClient, type SessionInfo, type ConversationSummary, type MemorySummary, type MemorySearchResponse, type MemorySearchResultItem, type UserProfile, type GenerateProfileResponse } from './client.js';
 import type { User } from './auth.js';
 import { A2UIProcessor, type SurfaceState } from './a2ui/processor.js';
@@ -1244,7 +1245,8 @@ export class NativeApp extends LitElement {
 
   private parseMarkdown(text: string): string {
     if (!text) return '';
-    return marked.parse(text, { async: false, breaks: true }) as string;
+    const rendered = marked.parse(text, { async: false, breaks: true }) as string;
+    return DOMPurify.sanitize(rendered);
   }
 
   private scrollToBottom() {
