@@ -29,6 +29,10 @@ RUN rm -f /etc/nginx/conf.d/default.conf
 # Default backend URL (override via env var in ACA)
 ENV BACKEND_URL=http://localhost:8000
 ENV BUILD_ID=
+ENV AUTH_MODE=mock
+ENV ENTRA_TENANT_ID=
+ENV ENTRA_CLIENT_ID=
+ENV ENTRA_API_SCOPE=
 
 EXPOSE 8080
 

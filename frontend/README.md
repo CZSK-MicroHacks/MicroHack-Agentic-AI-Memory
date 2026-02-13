@@ -6,6 +6,9 @@ A lightweight Lit (Web Components) app that **natively renders A2UI protocol com
 
 - Frontend does not connect to PostgreSQL directly.
 - PostgreSQL authentication mode (password vs managed identity) is handled in backend + infrastructure only.
+- Frontend auth modes:
+  - `entra` (default for cloud): uses MSAL browser login and sends bearer tokens.
+  - `mock` (local dev): sends `X-Mock-User-ID` (switch with `?mockUser=user-bob`).
 
 ## UI features
 
@@ -74,6 +77,13 @@ uv run server.py
 ```
 
 If you deploy behind a different API base URL, set `window.__APP_CONFIG__.apiBaseUrl` at runtime.
+
+Auth runtime config is injected by `config.js` in container deployments:
+
+- `authMode`
+- `entraTenantId`
+- `entraClientId`
+- `entraApiScope`
 
 ## Adding new converters
 

@@ -125,11 +125,16 @@ export class AGUIClient {
     this.baseUrl = baseUrl ?? (window as any).__APP_CONFIG__?.apiBaseUrl ?? '/api';
   }
 
+  private async authHeaders(): Promise<Record<string, string>> {
+    return getAuthHeaders();
+  }
+
   /* ── Auth ───────────────────────────────────────────────── */
 
   async getMe(): Promise<User> {
+    const authHeaders = await this.authHeaders();
     const res = await fetch(`${this.baseUrl}/me`, {
-      headers: { ...getAuthHeaders() },
+      headers: { ...authHeaders },
     });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     return res.json();
@@ -138,17 +143,19 @@ export class AGUIClient {
   /* ── Session CRUD ──────────────────────────────────────── */
 
   async listSessions(): Promise<SessionInfo[]> {
+    const authHeaders = await this.authHeaders();
     const res = await fetch(`${this.baseUrl}/sessions`, {
-      headers: { ...getAuthHeaders() },
+      headers: { ...authHeaders },
     });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     return res.json();
   }
 
   async createSession(title?: string): Promise<{ session_id: string }> {
+    const authHeaders = await this.authHeaders();
     const res = await fetch(`${this.baseUrl}/sessions`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
+      headers: { 'Content-Type': 'application/json', ...authHeaders },
       body: JSON.stringify({ title: title ?? null }),
     });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -156,17 +163,19 @@ export class AGUIClient {
   }
 
   async getSession(sessionId: string): Promise<SessionInfo> {
+    const authHeaders = await this.authHeaders();
     const res = await fetch(`${this.baseUrl}/sessions/${sessionId}`, {
-      headers: { ...getAuthHeaders() },
+      headers: { ...authHeaders },
     });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     return res.json();
   }
 
   async updateSession(sessionId: string, title: string): Promise<SessionInfo> {
+    const authHeaders = await this.authHeaders();
     const res = await fetch(`${this.baseUrl}/sessions/${sessionId}`, {
       method: 'PUT',
-      headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
+      headers: { 'Content-Type': 'application/json', ...authHeaders },
       body: JSON.stringify({ title }),
     });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -174,16 +183,18 @@ export class AGUIClient {
   }
 
   async deleteSession(sessionId: string): Promise<void> {
+    const authHeaders = await this.authHeaders();
     const res = await fetch(`${this.baseUrl}/sessions/${sessionId}`, {
       method: 'DELETE',
-      headers: { ...getAuthHeaders() },
+      headers: { ...authHeaders },
     });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
   }
 
   async getSessionHistory(sessionId: string): Promise<SessionHistoryMessage[]> {
+    const authHeaders = await this.authHeaders();
     const res = await fetch(`${this.baseUrl}/sessions/${sessionId}/history`, {
-      headers: { ...getAuthHeaders() },
+      headers: { ...authHeaders },
     });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const data = await res.json();
@@ -193,35 +204,39 @@ export class AGUIClient {
   /* ── Conversation History (Cosmos DB) ────────────────── */
 
   async listConversations(limit = 50, offset = 0): Promise<ConversationSummary[]> {
+    const authHeaders = await this.authHeaders();
     const res = await fetch(
       `${this.baseUrl}/conversations?limit=${limit}&offset=${offset}`,
-      { headers: { ...getAuthHeaders() } },
+      { headers: { ...authHeaders } },
     );
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     return res.json();
   }
 
   async getConversation(conversationId: string): Promise<ConversationDetail> {
+    const authHeaders = await this.authHeaders();
     const res = await fetch(`${this.baseUrl}/conversations/${conversationId}`, {
-      headers: { ...getAuthHeaders() },
+      headers: { ...authHeaders },
     });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     return res.json();
   }
 
   async updateConversation(conversationId: string, title: string): Promise<void> {
+    const authHeaders = await this.authHeaders();
     const res = await fetch(`${this.baseUrl}/conversations/${conversationId}`, {
       method: 'PUT',
-      headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
+      headers: { 'Content-Type': 'application/json', ...authHeaders },
       body: JSON.stringify({ title }),
     });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
   }
 
   async deleteConversation(conversationId: string): Promise<void> {
+    const authHeaders = await this.authHeaders();
     const res = await fetch(`${this.baseUrl}/conversations/${conversationId}`, {
       method: 'DELETE',
-      headers: { ...getAuthHeaders() },
+      headers: { ...authHeaders },
     });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
   }
@@ -229,9 +244,10 @@ export class AGUIClient {
   /* ── Conversation Memory (PostgreSQL + pgvector) ───────── */
 
   async createMemory(conversationId: string): Promise<MemorySummary> {
+    const authHeaders = await this.authHeaders();
     const res = await fetch(`${this.baseUrl}/memories`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
+      headers: { 'Content-Type': 'application/json', ...authHeaders },
       body: JSON.stringify({ conversation_id: conversationId }),
     });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -239,34 +255,38 @@ export class AGUIClient {
   }
 
   async listMemories(limit = 50, offset = 0): Promise<MemorySummary[]> {
+    const authHeaders = await this.authHeaders();
     const res = await fetch(
       `${this.baseUrl}/memories?limit=${limit}&offset=${offset}`,
-      { headers: { ...getAuthHeaders() } },
+      { headers: { ...authHeaders } },
     );
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     return res.json();
   }
 
   async getMemory(conversationId: string): Promise<MemorySummary> {
+    const authHeaders = await this.authHeaders();
     const res = await fetch(`${this.baseUrl}/memories/${conversationId}`, {
-      headers: { ...getAuthHeaders() },
+      headers: { ...authHeaders },
     });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     return res.json();
   }
 
   async deleteMemory(conversationId: string): Promise<void> {
+    const authHeaders = await this.authHeaders();
     const res = await fetch(`${this.baseUrl}/memories/${conversationId}`, {
       method: 'DELETE',
-      headers: { ...getAuthHeaders() },
+      headers: { ...authHeaders },
     });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
   }
 
   async searchMemories(query: string, limit = 10): Promise<MemorySearchResponse> {
+    const authHeaders = await this.authHeaders();
     const res = await fetch(`${this.baseUrl}/memories/search`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
+      headers: { 'Content-Type': 'application/json', ...authHeaders },
       body: JSON.stringify({ query, limit }),
     });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -276,8 +296,9 @@ export class AGUIClient {
   /* ── User Profile Memory ─────────────────────────────── */
 
   async getProfile(): Promise<UserProfile | null> {
+    const authHeaders = await this.authHeaders();
     const res = await fetch(`${this.baseUrl}/profile`, {
-      headers: { ...getAuthHeaders() },
+      headers: { ...authHeaders },
     });
     if (res.status === 404) return null;
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -285,9 +306,10 @@ export class AGUIClient {
   }
 
   async generateProfile(conversationId: string): Promise<GenerateProfileResponse> {
+    const authHeaders = await this.authHeaders();
     const res = await fetch(`${this.baseUrl}/profile/generate`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
+      headers: { 'Content-Type': 'application/json', ...authHeaders },
       body: JSON.stringify({ conversation_id: conversationId }),
     });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -295,9 +317,10 @@ export class AGUIClient {
   }
 
   async generateProfileFromAll(limit = 20): Promise<GenerateAllProfilesResponse> {
+    const authHeaders = await this.authHeaders();
     const res = await fetch(`${this.baseUrl}/profile/generate-all`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
+      headers: { 'Content-Type': 'application/json', ...authHeaders },
       body: JSON.stringify({ limit }),
     });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -305,9 +328,10 @@ export class AGUIClient {
   }
 
   async updateProfile(updates: Partial<UserProfile>): Promise<UserProfile> {
+    const authHeaders = await this.authHeaders();
     const res = await fetch(`${this.baseUrl}/profile`, {
       method: 'PUT',
-      headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
+      headers: { 'Content-Type': 'application/json', ...authHeaders },
       body: JSON.stringify(updates),
     });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -315,9 +339,10 @@ export class AGUIClient {
   }
 
   async deleteProfile(): Promise<void> {
+    const authHeaders = await this.authHeaders();
     const res = await fetch(`${this.baseUrl}/profile`, {
       method: 'DELETE',
-      headers: { ...getAuthHeaders() },
+      headers: { ...authHeaders },
     });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
   }
@@ -325,8 +350,9 @@ export class AGUIClient {
   /* ── Prompt ──────────────────────────────────────────────── */
 
   async getPrompt(name: string): Promise<{ name: string; content: string }> {
+    const authHeaders = await this.authHeaders();
     const res = await fetch(`${this.baseUrl}/prompts/${encodeURIComponent(name)}`, {
-      headers: { ...getAuthHeaders() },
+      headers: { ...authHeaders },
     });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     return res.json();
@@ -348,9 +374,10 @@ export class AGUIClient {
     threadId: string | null,
     callbacks: StreamCallbacks,
   ): Promise<{ sessionId: string | null }> {
+    const authHeaders = await this.authHeaders();
     const response = await fetch(`${this.baseUrl}/chat`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
+      headers: { 'Content-Type': 'application/json', ...authHeaders },
       body: JSON.stringify({
         messages: [{ role: 'user', content: message }],
         thread_id: threadId,

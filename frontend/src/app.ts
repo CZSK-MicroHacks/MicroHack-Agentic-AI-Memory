@@ -13,7 +13,7 @@ import { unsafeHTML } from 'lit/directives/unsafe-html.js';
 import { marked } from 'marked';
 import DOMPurify from 'dompurify';
 import { AGUIClient, type SessionInfo, type ConversationSummary, type MemorySummary, type MemorySearchResponse, type MemorySearchResultItem, type UserProfile, type GenerateProfileResponse } from './client.js';
-import type { User } from './auth.js';
+import { type User, getCurrentMockUserId, isMockAuthMode, setMockUserId } from './auth.js';
 import { A2UIProcessor, type SurfaceState } from './a2ui/processor.js';
 import { convertToolResult, convertGenericResult } from './converters.js';
 import { uiLogger, type UiErrorEvent } from './ui-logger.js';
@@ -40,6 +40,12 @@ interface ChatMessage {
   toolCalls: ToolCallInfo[];
   isStreaming?: boolean;
 }
+
+const MOCK_USERS = [
+  { id: 'user-alice', label: 'Alice Johnson' },
+  { id: 'user-bob', label: 'Bob Smith' },
+  { id: 'user-charlie', label: 'Charlie Lee' },
+];
 
 /* ── Component ────────────────────────────────────────────── */
 
@@ -73,8 +79,10 @@ export class NativeApp extends LitElement {
   @state() private promptContent: string | null = null;
   @state() private promptLoading = false;
   @state() private promptCopied = false;
+  @state() private selectedMockUserId = getCurrentMockUserId();
 
   private buildId = ((window as any).__APP_CONFIG__?.buildId ?? '').trim();
+  private readonly isMockAuth = isMockAuthMode();
 
   @query('.messages-area')
   private messagesArea!: HTMLElement;
@@ -381,6 +389,21 @@ export class NativeApp extends LitElement {
       color: light-dark(var(--n-60), var(--n-50));
     }
     .header-actions { display: flex; gap: 4px; align-items: center; }
+    .mock-user-select {
+      height: 32px;
+      min-width: 160px;
+      padding: 0 28px 0 10px;
+      border: 1px solid light-dark(var(--n-90), var(--n-30));
+      border-radius: 6px;
+      background: light-dark(var(--n-100), var(--n-20));
+      color: light-dark(var(--n-40), var(--n-70));
+      font-family: var(--font-family, inherit);
+      font-size: 12px;
+      outline: none;
+    }
+    .mock-user-select:focus {
+      border-color: light-dark(var(--n-70), var(--n-40));
+    }
     .hdr-btn {
       padding: 6px 12px;
       border: 1px solid light-dark(var(--n-90), var(--n-30));
@@ -1254,6 +1277,27 @@ export class NativeApp extends LitElement {
     }
   }
 
+  private async handleMockUserChange(event: Event) {
+    if (!this.isMockAuth) return;
+    const nextUserId = (event.target as HTMLSelectElement).value;
+    if (!nextUserId || nextUserId === this.selectedMockUserId) return;
+
+    setMockUserId(nextUserId);
+    this.selectedMockUserId = nextUserId;
+    this.sessionId = null;
+    this.activeConversationId = null;
+    this.selectedMemory = null;
+    this.messages = [];
+
+    await Promise.all([
+      this.fetchCurrentUser(),
+      this.refreshSessions(),
+      this.refreshConversations(),
+      this.refreshMemories(),
+      this.fetchProfile(),
+    ]);
+  }
+
   private parseMarkdown(text: string): string {
     if (!text) return '';
     const rendered = marked.parse(text, { async: false, breaks: true }) as string;
@@ -2099,6 +2143,18 @@ export class NativeApp extends LitElement {
           </div>
         </div>
         <div class="header-actions">
+          ${this.isMockAuth
+            ? html`
+              <select
+                class="mock-user-select"
+                title="Local mock user"
+                .value=${this.selectedMockUserId}
+                @change=${this.handleMockUserChange}
+              >
+                ${MOCK_USERS.map((u) => html`<option value=${u.id}>Mock: ${u.label}</option>`) }
+              </select>
+            `
+            : nothing}
           ${this.sessionId
             ? html`<button class="hdr-btn" @click=${this.newChat}>New Chat</button>`
             : nothing}

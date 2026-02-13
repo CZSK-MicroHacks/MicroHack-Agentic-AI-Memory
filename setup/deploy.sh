@@ -40,8 +40,8 @@ fi
 IDENTITY_CLIENT_ID=$(az identity show -n "id-${PROJECT_NAME}" -g "$RESOURCE_GROUP" --query clientId -o tsv)
 IDENTITY_RESOURCE_ID=$(az identity show -n "id-${PROJECT_NAME}" -g "$RESOURCE_GROUP" --query id -o tsv)
 
-# Image tags – use git short hash or timestamp
-TAG="${DEPLOY_TAG:-$(git -C "$PROJECT_ROOT" rev-parse --short HEAD 2>/dev/null || date +%Y%m%d%H%M%S)}"
+# Image tags – default to git short hash + timestamp to avoid stale-tag rollouts
+TAG="${DEPLOY_TAG:-$(git -C "$PROJECT_ROOT" rev-parse --short HEAD 2>/dev/null || echo local)-$(date +%Y%m%d%H%M%S)}"
 BUILD_ID="${DEPLOY_BUILD_ID:-$(git -C "$PROJECT_ROOT" rev-parse HEAD 2>/dev/null || echo "")}"
 
 # ── Service endpoints (from Terraform-provisioned resources) ────────────────
@@ -49,6 +49,13 @@ COSMOS_ENDPOINT=$(az cosmosdb show -n "cosmos-${PROJECT_NAME}" -g "$RESOURCE_GRO
 PG_FQDN=$(az postgres flexible-server show -n "pgflex-${PROJECT_NAME}" -g "$RESOURCE_GROUP" --query fullyQualifiedDomainName -o tsv)
 BACKEND_FQDN=$(az containerapp show -n "$BACKEND_APP" -g "$RESOURCE_GROUP" --query "properties.configuration.ingress.fqdn" -o tsv)
 OPENAI_ENDPOINT=$(az cognitiveservices account show -n "aifoundry-${PROJECT_NAME}" -g "$RESOURCE_GROUP" --query "properties.endpoint" -o tsv)
+
+# Auth settings (prefer Terraform outputs so deploy always matches infra state)
+AUTH_MODE="${AUTH_MODE:-$(terraform -chdir="$PROJECT_ROOT/infra" output -raw auth_mode 2>/dev/null || echo entra)}"
+ENTRA_TENANT_ID="$(terraform -chdir="$PROJECT_ROOT/infra" output -raw entra_tenant_id 2>/dev/null || echo "")"
+BACKEND_API_CLIENT_ID="$(terraform -chdir="$PROJECT_ROOT/infra" output -raw backend_api_client_id 2>/dev/null || echo "")"
+FRONTEND_SPA_CLIENT_ID="$(terraform -chdir="$PROJECT_ROOT/infra" output -raw frontend_spa_client_id 2>/dev/null || echo "")"
+BACKEND_API_SCOPE="$(terraform -chdir="$PROJECT_ROOT/infra" output -raw backend_api_scope 2>/dev/null || echo "")"
 
 # ── Helpers ─────────────────────────────────────────────────────────────────
 log()  { echo "──▶ $*"; }
@@ -97,6 +104,10 @@ deploy_backend() {
     --image "${ACR_LOGIN_SERVER}/${BACKEND_APP}:${TAG}" \
     --set-env-vars \
       "AZURE_CLIENT_ID=${IDENTITY_CLIENT_ID}" \
+      "AUTH_MODE=${AUTH_MODE}" \
+      "ENTRA_TENANT_ID=${ENTRA_TENANT_ID}" \
+      "ENTRA_AUDIENCE=${BACKEND_API_CLIENT_ID}" \
+      "ENTRA_REQUIRED_SCOPES=access_as_user" \
       "COSMOS_ENDPOINT=${COSMOS_ENDPOINT}" \
       "COSMOS_DATABASE_NAME=ag-ui-db" \
       "COSMOS_CONTAINER_NAME=conversations" \
@@ -131,7 +142,11 @@ deploy_frontend() {
     --image "${ACR_LOGIN_SERVER}/${FRONTEND_APP}:${TAG}" \
     --set-env-vars \
       "BACKEND_URL=https://${BACKEND_FQDN}" \
-      "BUILD_ID=${BUILD_ID}"
+      "BUILD_ID=${BUILD_ID}" \
+      "AUTH_MODE=${AUTH_MODE}" \
+      "ENTRA_TENANT_ID=${ENTRA_TENANT_ID}" \
+      "ENTRA_CLIENT_ID=${FRONTEND_SPA_CLIENT_ID}" \
+      "ENTRA_API_SCOPE=${BACKEND_API_SCOPE}"
   ok "Frontend container app updated"
 
   # Ensure ingress target port matches nginx
@@ -181,15 +196,24 @@ smoke_test() {
   log "Running smoke tests…"
   local failures=0
 
-  # Backend /me
+  # Backend /me (unauthenticated must be rejected in entra mode)
   local backend_url="https://${BACKEND_FQDN}"
   local status
-  status=$(curl -s -o /dev/null -w "%{http_code}" "${backend_url}/me" -H "X-User-Id: user-alice" 2>/dev/null || echo "000")
-  if [[ "$status" == "200" ]]; then
-    ok "Backend /me → 200"
+  status=$(curl -s -o /dev/null -w "%{http_code}" "${backend_url}/me" 2>/dev/null || echo "000")
+  if [[ "$AUTH_MODE" == "entra" ]]; then
+    if [[ "$status" == "401" ]]; then
+      ok "Backend /me unauthenticated → 401"
+    else
+      echo "  ⚠️  Backend /me unauthenticated → ${status} (expected 401 in entra mode)"
+      failures=$((failures + 1))
+    fi
   else
-    echo "  ⚠️  Backend /me → ${status}"
-    failures=$((failures + 1))
+    if [[ "$status" == "401" ]]; then
+      ok "Backend /me without mock header → 401"
+    else
+      echo "  ⚠️  Backend /me without mock header → ${status} (expected 401 in mock mode)"
+      failures=$((failures + 1))
+    fi
   fi
 
   # Frontend index
@@ -218,7 +242,7 @@ smoke_test() {
   status=$(curl -s -o /dev/null -w "%{http_code}" -X OPTIONS "${backend_url}/me" \
     -H "Origin: https://${frontend_fqdn}" \
     -H "Access-Control-Request-Method: GET" \
-    -H "Access-Control-Request-Headers: X-User-Id" 2>/dev/null || echo "000")
+    -H "Access-Control-Request-Headers: Authorization" 2>/dev/null || echo "000")
   if [[ "$status" == "200" ]]; then
     ok "CORS preflight → 200"
   else

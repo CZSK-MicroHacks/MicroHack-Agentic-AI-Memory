@@ -5,4 +5,5 @@ project_name            = "mhaimem"
 postgres_admin_password = "P@ssw0rd2026!"
 postgres_location       = "northcentralus"
 postgres_password_auth_enabled = true
+frontend_redirect_uri = "https://ca-frontend-mhaimem.happytree-c6a96aa3.eastus2.azurecontainerapps.io/"
 

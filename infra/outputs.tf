@@ -105,3 +105,24 @@ output "openai_chat_deployment" {
 output "openai_embedding_deployment" {
   value = azapi_resource.deployment_text_embedding_3_large.name
 }
+
+# Entra ID app registrations
+output "entra_tenant_id" {
+  value = data.azuread_client_config.current.tenant_id
+}
+
+output "backend_api_client_id" {
+  value = azuread_application.backend_api.client_id
+}
+
+output "frontend_spa_client_id" {
+  value = azuread_application.frontend_spa.client_id
+}
+
+output "backend_api_scope" {
+  value = "${one(azuread_application.backend_api.identifier_uris)}/access_as_user"
+}
+
+output "auth_mode" {
+  value = lower(var.auth_mode)
+}

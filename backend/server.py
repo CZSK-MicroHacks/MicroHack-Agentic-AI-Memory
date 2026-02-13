@@ -32,7 +32,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
-from auth import User, get_current_user, MOCK_USERS
+from auth import User, get_current_user
 from conversation_history import ConversationHistoryStore
 from conversation_memory import ConversationMemoryStore
 from memory_agent import MemoryAgent
