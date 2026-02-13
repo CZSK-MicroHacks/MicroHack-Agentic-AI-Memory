@@ -17,7 +17,7 @@ resource "azurerm_postgresql_flexible_server" "main" {
 
   authentication {
     active_directory_auth_enabled = true
-    password_auth_enabled         = true
+    password_auth_enabled         = var.postgres_password_auth_enabled
     tenant_id                     = data.azurerm_client_config.current.tenant_id
   }
 

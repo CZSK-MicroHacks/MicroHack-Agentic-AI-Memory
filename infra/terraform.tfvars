@@ -4,4 +4,5 @@ location                = "eastus2"
 project_name            = "mhaimem"
 postgres_admin_password = "P@ssw0rd2026!"
 postgres_location       = "northcentralus"
+postgres_password_auth_enabled = true
 

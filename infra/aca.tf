@@ -97,19 +97,14 @@ resource "azurerm_container_app" "backend" {
         value = azurerm_postgresql_flexible_server_database.appdb.name
       }
       env {
-        name  = "PG_USER"
-        value = var.postgres_admin_login
+        name  = "PG_AUTH_MODE"
+        value = "managed_identity"
       }
       env {
-        name  = "PG_PASSWORD"
-        secret_name = "pg-password"
+        name  = "PG_AAD_PRINCIPAL_NAME"
+        value = azurerm_user_assigned_identity.app.name
       }
     }
-  }
-
-  secret {
-    name  = "pg-password"
-    value = var.postgres_admin_password
   }
 
   ingress {

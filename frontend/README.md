@@ -2,6 +2,11 @@
 
 A lightweight Lit (Web Components) app that **natively renders A2UI protocol components** from tool-call results. It also provides a full chat UI with sessions, conversation history, memory search, and user profile memory.
 
+## Authentication boundary
+
+- Frontend does not connect to PostgreSQL directly.
+- PostgreSQL authentication mode (password vs managed identity) is handled in backend + infrastructure only.
+
 ## UI features
 
 - Live chat with streaming responses and tool-call surfaces

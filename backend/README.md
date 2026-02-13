@@ -78,7 +78,11 @@ Optional (memory + profile):
 - `COSMOS_DATABASE_NAME` / `COSMOS_CONTAINER_NAME`
 - `COSMOS_UPM_DATABASE_NAME` / `COSMOS_UPM_CONTAINER_NAME`
 - `COSMOS_EMULATOR_DISABLE_SSL_VERIFY`
-- `PG_HOST` / `PG_PORT` / `PG_USER` / `PG_PASSWORD` / `PG_DATABASE`
+- `PG_HOST` / `PG_PORT` / `PG_DATABASE`
+- `PG_AUTH_MODE` (`password` or `managed_identity`, default `password`)
+- `PG_AAD_PRINCIPAL_NAME` (required when `PG_AUTH_MODE=managed_identity`, unless `PG_USER` is set)
+- `PG_USER` / `PG_PASSWORD` (used in `password` mode)
+- `PG_SSLMODE` (optional override; default is `require` for `managed_identity`, `prefer` for `password`)
 - `AGUI_SERVER_URL` (for `client.py`)
 
 ## Core endpoints

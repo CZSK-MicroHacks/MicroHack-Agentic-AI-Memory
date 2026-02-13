@@ -18,7 +18,7 @@ resource "azapi_resource" "ai_foundry" {
       type = "SystemAssigned"
     }
     properties = {
-      disableLocalAuth        = false
+      disableLocalAuth        = true
       allowProjectManagement  = true
       customSubDomainName     = "aifoundry-${var.project_name}"
     }

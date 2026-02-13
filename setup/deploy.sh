@@ -105,8 +105,8 @@ deploy_backend() {
       "PG_HOST=${PG_FQDN}" \
       "PG_PORT=5432" \
       "PG_DATABASE=appdb" \
-      "PG_USER=pgadmin" \
-      "PG_PASSWORD=P@ssw0rd2026!" \
+      "PG_AUTH_MODE=managed_identity" \
+      "PG_AAD_PRINCIPAL_NAME=id-${PROJECT_NAME}" \
       "AZURE_OPENAI_ENDPOINT=${OPENAI_ENDPOINT}" \
       "AZURE_OPENAI_DEPLOYMENT_NAME=gpt-4o-mini" \
       "AZURE_OPENAI_EMBEDDING_DEPLOYMENT_NAME=text-embedding-3-large"

@@ -14,6 +14,7 @@ import os
 from typing import Any
 
 import asyncpg
+from azure.identity import DefaultAzureCredential, ManagedIdentityCredential
 
 logger = logging.getLogger("ag_ui.conversation_memory")
 
@@ -31,24 +32,37 @@ class ConversationMemoryStore:
     ):
         self._host = host or os.getenv("PG_HOST", "localhost")
         self._port = port or int(os.getenv("PG_PORT", "5432"))
-        self._user = user or os.getenv("PG_USER", "app")
+        self._auth_mode = os.getenv("PG_AUTH_MODE", "password").strip().lower()
+        self._aad_principal_name = os.getenv("PG_AAD_PRINCIPAL_NAME", "").strip()
+        self._user = user or self._aad_principal_name or os.getenv("PG_USER", "app")
         self._password = password or os.getenv("PG_PASSWORD", "app_pwd")
         self._database = database or os.getenv("PG_DATABASE", "appdb")
+        self._azure_client_id = os.getenv("AZURE_CLIENT_ID", "").strip()
+        configured_ssl_mode = os.getenv("PG_SSLMODE", "").strip()
+        self._ssl_mode = (
+            configured_ssl_mode
+            if configured_ssl_mode
+            else ("require" if self._auth_mode == "managed_identity" else "prefer")
+        )
         self._pool: asyncpg.Pool | None = None
+        self._token_credential: ManagedIdentityCredential | DefaultAzureCredential | None = None
+
+        valid_modes = {"password", "managed_identity"}
+        if self._auth_mode not in valid_modes:
+            raise RuntimeError(
+                f"Invalid PG_AUTH_MODE='{self._auth_mode}'. Expected one of: {', '.join(sorted(valid_modes))}"
+            )
+
+        if self._auth_mode == "managed_identity" and not self._user:
+            raise RuntimeError(
+                "PG_AAD_PRINCIPAL_NAME (or PG_USER) is required when PG_AUTH_MODE=managed_identity"
+            )
 
     # ── Lifecycle ────────────────────────────────────────────
 
     async def initialize(self) -> None:
         """Create connection pool and ensure the table + extension exist."""
-        self._pool = await asyncpg.create_pool(
-            host=self._host,
-            port=self._port,
-            user=self._user,
-            password=self._password,
-            database=self._database,
-            min_size=2,
-            max_size=10,
-        )
+        self._pool = await asyncpg.create_pool(**self._build_pool_kwargs())
 
         # Register the vector type codec so asyncpg can handle vector columns
         async with self._pool.acquire() as conn:
@@ -69,9 +83,44 @@ class ConversationMemoryStore:
             """)
 
         logger.info(
-            "PostgreSQL memory store initialized: %s@%s:%s/%s",
-            self._user, self._host, self._port, self._database,
+            "PostgreSQL memory store initialized: auth=%s user=%s host=%s:%s db=%s ssl=%s",
+            self._auth_mode,
+            self._user,
+            self._host,
+            self._port,
+            self._database,
+            self._ssl_mode,
         )
+
+    def _build_pool_kwargs(self) -> dict[str, Any]:
+        kwargs: dict[str, Any] = {
+            "host": self._host,
+            "port": self._port,
+            "user": self._user,
+            "database": self._database,
+            "min_size": 2,
+            "max_size": 10,
+            "ssl": self._ssl_mode,
+        }
+
+        if self._auth_mode == "managed_identity":
+            kwargs["password"] = self._get_postgres_aad_token
+        else:
+            kwargs["password"] = self._password
+
+        return kwargs
+
+    def _get_postgres_aad_token(self) -> str:
+        if self._token_credential is None:
+            if self._azure_client_id:
+                self._token_credential = ManagedIdentityCredential(client_id=self._azure_client_id)
+            else:
+                self._token_credential = DefaultAzureCredential()
+
+        token = self._token_credential.get_token(
+            "https://ossrdbms-aad.database.windows.net/.default"
+        )
+        return token.token
 
     async def close(self) -> None:
         """Close the connection pool."""

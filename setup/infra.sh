@@ -45,6 +45,7 @@ terraform -chdir="$INFRA_DIR" init
 case "$ACTION" in
   plan)
     log "Planning infrastructure"
+    log "Reminder: after apply, ensure PostgreSQL Entra principal exists for app identity (pgaadauth_create_principal)."
     terraform -chdir="$INFRA_DIR" plan -var-file="$TFVARS_FILE" -out=tfplan
     ;;
   apply)
@@ -56,6 +57,7 @@ case "$ACTION" in
     else
       terraform -chdir="$INFRA_DIR" apply tfplan
     fi
+    log "Next step: create/update PostgreSQL Entra principal and grants for the app managed identity configured in Terraform."
     ;;
   destroy)
     log "Destroying infrastructure"

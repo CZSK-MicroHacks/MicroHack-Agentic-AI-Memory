@@ -75,6 +75,12 @@ variable "postgres_version" {
   default     = "16"
 }
 
+variable "postgres_password_auth_enabled" {
+  description = "Whether PostgreSQL password authentication remains enabled (set false after managed identity cutover)."
+  type        = bool
+  default     = true
+}
+
 
 
 # -----------------------------------------------------------------------------
