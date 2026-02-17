@@ -1751,6 +1751,9 @@ export class NativeApp extends LitElement {
 
   private toggleProfileDrawer() {
     this.profileDrawerOpen = !this.profileDrawerOpen;
+    if (this.profileDrawerOpen) {
+      this.fetchProfile();
+    }
   }
 
   private async handleGenerateProfileFromAll() {
@@ -2210,7 +2213,7 @@ export class NativeApp extends LitElement {
     const suggestions = [
       { text: 'What is the status of order ORD-001?', icon: 'local_shipping' },
       { text: 'Check order ORD-002', icon: 'package_2' },
-      { text: 'Where is my package ORD-003?', icon: 'help' },
+      { text: 'Where is my package ORD-003 and what products are there?', icon: 'help' },
     ];
     return html`
       <div class="welcome">

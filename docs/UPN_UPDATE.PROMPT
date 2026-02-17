@@ -1,0 +1,30 @@
+Let's implement generating user profile improvement. Current solution only supports manul creation of User Profile Memory (UPN). I want to improve that by implementing continues UPN update. This new approach will:
+- let the LLM model decide whether to update / create UPN
+- remove the risk of LLM missconfigure the actual JSON structure of UPN
+- streamlines the UPM maintanace
+
+What needs to be done:
+- extend the master prompt template with instructions to consider current user request / message and decide whether it contains any notable user interestes, preferences, etc. and if so, proceed with update
+- create a new tool called "update_user_profile" which will be triggered by the preceeding bullet
+- the LLM Model (master prompt) is calling the tool with Use of  RFC 7396 (JSON Merge Patch–style semantics) which generates
+- the tool will implemnt the Use RFC 7396 (JSON Merge Patch–style semantics) to our CosmosDB which stores the UPN
+
+The initial UPN's JSON structure is:
+
+{
+  "profile_changed": true or false,
+  "change_summary": "Brief description of what changed, or 'No new personal information found'",
+  "facts_added": 0,
+  "facts_updated": 0,
+  "facts_removed": 0,
+  "profile": {
+    "basic_info": { ... },
+    "interests": [ ... ],
+    "habits": [ ... ],
+    "preferences": { ... },
+    "status": { ... },
+    "facts": [ ... ]
+  }
+}
+
+Create a carefull design for this feature only, no code yet.
