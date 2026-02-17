@@ -13,7 +13,6 @@ Architecture:
 - Custom AG-UI endpoint: Integrates session management with streaming responses
 """
 
-import contextvars
 import json
 import logging
 import os
@@ -23,7 +22,7 @@ from pathlib import Path
 
 import jinja2
 from datetime import datetime
-from typing import Annotated, Any
+from typing import Any
 from collections.abc import AsyncIterator
 
 from dotenv import load_dotenv
@@ -39,8 +38,9 @@ from memory_agent import MemoryAgent
 from rag_client import RAGClient
 from user_profile_memory import UserProfileMemoryStore
 from profile_agent import ProfileAgent
+from agent_tools import AgentTools
 
-from agent_framework import ChatAgent, AgentThread, ChatMessageStore, tool
+from agent_framework import ChatAgent, AgentThread, ChatMessageStore
 from agent_framework._threads import ChatMessage
 from agent_framework.azure import AzureOpenAIChatClient
 from azure.identity import DefaultAzureCredential
@@ -393,227 +393,6 @@ rag_client = RAGClient()
 
 
 # =============================================================================
-# Tools
-# =============================================================================
-
-# ContextVar to propagate the current user_id into @tool functions
-_current_user_id: contextvars.ContextVar[str] = contextvars.ContextVar("_current_user_id")
-
-def json_merge_patch(target: dict[str, Any], patch: dict[str, Any]) -> dict[str, Any]:
-    """RFC 7396 JSON Merge Patch — recursive merge with null-removal."""
-    result = dict(target)
-    for key, value in patch.items():
-        if value is None:
-            result.pop(key, None)
-        elif isinstance(value, dict) and isinstance(result.get(key), dict):
-            result[key] = json_merge_patch(result[key], value)
-        else:
-            result[key] = value
-    return result
-
-
-# Status → Material Symbol icon name mapping
-_STATUS_ICONS = {
-    "shipped": "local_shipping",
-    "processing": "pending",
-    "delivered": "check_circle",
-    "not_found": "error",
-}
-
-
-@tool
-async def check_memory(
-    query: Annotated[str, Field(description="Natural-language query to search past conversations")],
-) -> str:
-    """Search the user's conversation memory for relevant past conversations.
-
-    Use this tool when the user explicitly references or asks about something
-    from a previous conversation. Returns the top 3 most relevant conversation
-    summaries based on semantic similarity.
-    """
-    user_id = _current_user_id.get()
-    logger.info("Running check_memory tool with query: %s for user: %s", query, user_id)
-    query_embedding = await memory_agent._embed(query)
-
-    rows = await memory_store.search(
-        user_id=user_id,
-        query_embedding=query_embedding,
-        limit=3,
-    )
-
-    if not rows:
-        logger.info("No relevant past conversations found for query: %s", query)
-        return "No relevant past conversations found."
-    
-    logger.info("Found %d relevant conversations for query: %s", len(rows), query)
-    results = []
-    for i, row in enumerate(rows, 1):
-        results.append(f"{i}. {row['summary']}")
-
-    return "\n".join(results)
-
-
-@tool
-def get_order_status(
-    order_id: Annotated[str, Field(description="The order ID to look up (e.g., ORD-001)")]
-) -> dict:
-    """Look up the status of a customer order.
-
-    Returns a data model ready for the Shipping Status A2UI template:
-      trackingNumber  – display string with tracking code
-      currentStepIcon – Material Symbol name for the active step
-      eta             – estimated delivery display string
-    """
-    orders = {
-        "ORD-001": {"status": "shipped",    "tracking": "1Z999AA1", "eta": "Jan 25, 2026"},
-        "ORD-002": {"status": "processing", "tracking": None,       "eta": "Jan 23, 2026"},
-        "ORD-003": {"status": "delivered",  "tracking": "1Z999AA3", "eta": "Delivered Jan 20"},
-    }
-    raw = orders.get(order_id)
-
-    if raw is None:
-        return {
-            "trackingNumber": "Tracking: N/A",
-            "currentStepIcon": "error",
-            "eta": "Order not found",
-        }
-
-    return {
-        "trackingNumber": f"Tracking: {raw['tracking']}" if raw.get("tracking") else "Tracking: N/A",
-        "currentStepIcon": _STATUS_ICONS.get(raw["status"], "help"),
-        "eta": f"Estimated delivery: {raw['eta']}" if raw.get("eta") else "",
-    }
-
-
-@tool
-async def do_rag(
-    query: Annotated[str, Field(description="Natural-language question to search the knowledge base for")],
-) -> dict:
-    """Search the company knowledge base for detailed information about orders,
-    products, shipping, and return/refund policies.
-
-    Use this tool when you need:
-    - Detailed product specifications or descriptions
-    - Shipping carrier, weight, or packaging information
-    - Return policy rules, eligibility windows, or refund timelines
-    - Any information beyond the basic order status
-
-    Do NOT use this tool for a simple order status check — use
-    get_order_status for that instead.
-    """
-    logger.info("Running do_rag tool with query: %s", query)
-    try:
-        result = await rag_client.retrieve(query=query)
-    except Exception as e:
-        logger.error("do_rag tool failed: %s", e, exc_info=True)
-        return {"content": f"Knowledge base search failed: {e}", "citations": []}
-
-    if not result.content and not result.citations:
-        return {"content": "No relevant information found in the knowledge base.", "citations": []}
-
-    citations_list = []
-    for i, cit in enumerate(result.citations):
-        citations_list.append({
-            "search_idx": i,
-            "ref_id": cit.ref_id,
-            "source_name": cit.source_name,
-            "content": cit.content,
-            "annotation": f"\u3010{i}:{cit.ref_id}\u2020{cit.source_name}\u3011",
-        })
-
-    return {
-        "content": result.content,
-        "citations": citations_list,
-    }
-
-
-@tool
-async def update_user_profile(
-    basic_info: Annotated[dict[str, Any] | None, Field(
-        default=None,
-        description="Object with keys like name, location, job, company. Only include changed fields.",
-    )] = None,
-    interests: Annotated[list[str] | None, Field(
-        default=None,
-        description="Full list of user interests (merge new items with existing ones).",
-    )] = None,
-    habits: Annotated[list[str] | None, Field(
-        default=None,
-        description="Full list of user habits (merge new items with existing ones).",
-    )] = None,
-    preferences: Annotated[dict[str, Any] | None, Field(
-        default=None,
-        description="Object with user preferences. Only include changed fields.",
-    )] = None,
-    status: Annotated[dict[str, Any] | None, Field(
-        default=None,
-        description="Object with current life status or events. Only include changed fields.",
-    )] = None,
-    facts: Annotated[list[str] | None, Field(
-        default=None,
-        description="Full list of personal facts (pets, allergies, family, birthday, etc.).",
-    )] = None,
-) -> str:
-    """Update the user's stored profile with new personal information.
-
-    Call this when the user explicitly mentions new or changed personal
-    information. Pass only the fields that changed.
-    """
-    user_id = _current_user_id.get()
-
-    # Build patch from non-None arguments
-    patch_dict: dict[str, Any] = {}
-    if basic_info is not None:
-        patch_dict["basic_info"] = basic_info
-    if interests is not None:
-        patch_dict["interests"] = interests
-    if habits is not None:
-        patch_dict["habits"] = habits
-    if preferences is not None:
-        patch_dict["preferences"] = preferences
-    if status is not None:
-        patch_dict["status"] = status
-    if facts is not None:
-        patch_dict["facts"] = facts
-
-    logger.info("Running update_user_profile tool for user: %s with patch: %s", user_id, patch_dict)
-
-    if not patch_dict:
-        return "No profile fields provided"
-
-    # Read current profile
-    existing = await profile_store.get_profile(user_id)
-    existing_sections: dict[str, Any] = {
-        "basic_info": {},
-        "interests": [],
-        "habits": [],
-        "preferences": {},
-        "status": {},
-        "facts": [],
-    }
-    if existing:
-        for key in existing_sections:
-            if key in existing:
-                existing_sections[key] = existing[key]
-
-    # Apply merge patch
-    merged = json_merge_patch(existing_sections, patch_dict)
-
-    # Upsert to Cosmos DB
-    await profile_store.upsert_profile(
-        user_id=user_id,
-        profile_sections=merged,
-        source_conversation=None,
-    )
-
-    # Return summary
-    changed_keys = list(patch_dict.keys())
-    summary = f"Profile updated: {', '.join(changed_keys)}"
-    logger.info("Profile updated for user=%s: %s", user_id, summary)
-    return summary
-
-
-# =============================================================================
 # Agent Configuration
 # =============================================================================
 
@@ -624,12 +403,26 @@ chat_client = AzureOpenAIChatClient(
     deployment_name=model_deployment,
 )
 
+# Initialize the memory agent (summariser + embedder) — must be after chat_client
+memory_agent = MemoryAgent(chat_client=chat_client)
+
+# Initialize the profile agent (user profile extraction) — must be after chat_client
+profile_agent = ProfileAgent(chat_client=chat_client)
+
+# Initialize agent tools (dependency-injected tool implementations)
+agent_tools = AgentTools(
+    memory_store=memory_store,
+    memory_agent=memory_agent,
+    profile_store=profile_store,
+    rag_client=rag_client,
+)
+
 # Configure the default agent (no profile — used as fallback)
 agent = ChatAgent(
     name="CustomerSupportAgent",
     instructions=CUSTOMER_SUPPORT_PROMPT,
     chat_client=chat_client,
-    tools=[get_order_status, check_memory, do_rag, update_user_profile],
+    tools=agent_tools.all,
 )
 
 
@@ -643,9 +436,7 @@ def _build_personalized_agent(
     If *user_profile* is ``None`` or empty the global default agent is
     returned so we avoid an unnecessary re-render.
     """
-    tools = [get_order_status, check_memory, update_user_profile]
-    if rag_enabled:
-        tools.append(do_rag)
+    tools = agent_tools.all if rag_enabled else agent_tools.without_rag()
 
     if not user_profile and rag_enabled:
         return agent  # global default already has all tools
@@ -661,13 +452,6 @@ def _build_personalized_agent(
         chat_client=chat_client,
         tools=tools,
     )
-
-
-# Initialize the memory agent (summariser + embedder) — must be after chat_client
-memory_agent = MemoryAgent(chat_client=chat_client)
-
-# Initialize the profile agent (user profile extraction) — must be after chat_client
-profile_agent = ProfileAgent(chat_client=chat_client)
 
 
 # =============================================================================
@@ -1470,7 +1254,7 @@ async def stream_agent_response(
     logger.info("[IN] session=%s run=%s user_message=%s", session_id, run_id, user_message)
 
     # Set the current user_id so @tool functions can access it
-    _current_user_id.set(user_id)
+    agent_tools.set_user_id(user_id)
 
     # Emit RUN_STARTED with thread/session ID
     logger.info("[OUT] session=%s run=%s event=RUN_STARTED", session_id, run_id)
