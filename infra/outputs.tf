@@ -106,6 +106,15 @@ output "openai_embedding_deployment" {
   value = azapi_resource.deployment_text_embedding_3_large.name
 }
 
+# Azure AI Search
+output "search_endpoint" {
+  value = "https://${azurerm_search_service.main.name}.search.windows.net"
+}
+
+output "search_name" {
+  value = azurerm_search_service.main.name
+}
+
 # Entra ID app registrations
 output "entra_tenant_id" {
   value = data.azuread_client_config.current.tenant_id

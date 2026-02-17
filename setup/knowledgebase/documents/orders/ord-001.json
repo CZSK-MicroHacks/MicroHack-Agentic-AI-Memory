@@ -1,0 +1,20 @@
+[
+  {
+    "id": "ord-001-overview",
+    "order_id": "ORD-001",
+    "category": "order_detail",
+    "page_chunk": "Order ORD-001 was placed on January 15, 2026 by the customer. The order contains 2 items: (1) Wireless Noise-Cancelling Headphones (Model: WH-1000XM5, Color: Black, Qty: 1, Price: $349.99) and (2) USB-C Charging Cable 2m (Qty: 2, Price: $14.99 each). Order subtotal: $379.97. Shipping: $9.99 (Standard). Tax: $31.20. Order total: $421.16. Payment method: Visa ending in 4242."
+  },
+  {
+    "id": "ord-001-shipping",
+    "order_id": "ORD-001",
+    "category": "shipping",
+    "page_chunk": "Order ORD-001 was shipped on January 18, 2026 via UPS Ground. Tracking number: 1Z999AA1. The package was dispatched from the Seattle fulfillment center. Estimated delivery date: January 25, 2026. Shipping address: 123 Main Street, Apt 4B, Seattle, WA 98101. Current status: In transit — last scanned at Portland sorting facility on January 20, 2026."
+  },
+  {
+    "id": "ord-001-product",
+    "order_id": "ORD-001",
+    "category": "product",
+    "page_chunk": "Wireless Noise-Cancelling Headphones (WH-1000XM5): Premium over-ear headphones with industry-leading noise cancellation. Features include 30-hour battery life, multipoint Bluetooth connection, speak-to-chat automatic pause, adaptive sound control, and Hi-Res Audio support. Comes with carrying case, USB-C charging cable (included), and 3.5mm audio cable. Warranty: 1 year manufacturer warranty from date of delivery. Eligible for extended warranty purchase within 30 days of delivery."
+  }
+]

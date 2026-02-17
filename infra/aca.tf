@@ -55,6 +55,16 @@ resource "azurerm_container_app" "backend" {
         value = azapi_resource.deployment_text_embedding_3_large.name
       }
 
+      # Azure AI Search
+      env {
+        name  = "AZURE_SEARCH_ENDPOINT"
+        value = "https://${azurerm_search_service.main.name}.search.windows.net"
+      }
+      env {
+        name  = "AZURE_SEARCH_KNOWLEDGE_BASE_NAME"
+        value = "customer-support-kb"
+      }
+
       # Cosmos DB
       env {
         name  = "COSMOS_ENDPOINT"

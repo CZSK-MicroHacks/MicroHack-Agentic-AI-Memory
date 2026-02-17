@@ -15,6 +15,7 @@
 
 import type { A2UIMessage, ComponentDef, DataEntry } from './a2ui/types.js';
 import { SHIPPING_STATUS_TEMPLATE } from './templates/shipping-status.js';
+import { RAG_CITATIONS_TEMPLATE } from './templates/rag-citations.js';
 
 /* ────────────────────────────────────────────────────────────
  * Template inflater
@@ -100,6 +101,51 @@ converters.set('get_order_status', (result: unknown, surfaceId: string): A2UIMes
   return inflateSurfaceTemplate(
     SHIPPING_STATUS_TEMPLATE,
     result as Record<string, unknown>,
+    surfaceId,
+  );
+});
+
+/* ────────────────────────────────────────────────────────────
+ * do_rag converter  →  RAG Citations template
+ *
+ * The backend returns { content, citations[] } where each citation has
+ * search_idx, ref_id, source_name, content, and annotation.
+ * We map this to the data model expected by RAG_CITATIONS_TEMPLATE.
+ * ──────────────────────────────────────────────────────────── */
+
+converters.set('do_rag', (result: unknown, surfaceId: string): A2UIMessage[] => {
+  const data = result as {
+    content?: string;
+    citations?: Array<{
+      search_idx: number;
+      ref_id: string;
+      source_name: string;
+      content: string;
+      annotation: string;
+    }>;
+  };
+
+  const citations = data.citations ?? [];
+
+  // If no citations, skip A2UI surface entirely — the text response is enough
+  if (citations.length === 0) return [];
+
+  const citationCount = `${citations.length} source${citations.length !== 1 ? 's' : ''}`;
+
+  // Build data model for the template
+  const citationsMap: Record<string, Record<string, string>> = {};
+  for (let i = 0; i < citations.length; i++) {
+    const c = citations[i];
+    const snippet = c.content.length > 150 ? c.content.slice(0, 150) + '…' : c.content;
+    citationsMap[String(i)] = {
+      sourceName: `${c.annotation}  ${c.source_name}`,
+      snippet,
+    };
+  }
+
+  return inflateSurfaceTemplate(
+    RAG_CITATIONS_TEMPLATE,
+    { citationCount, citations: citationsMap },
     surfaceId,
   );
 });

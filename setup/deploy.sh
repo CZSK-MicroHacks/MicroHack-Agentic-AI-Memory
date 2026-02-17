@@ -49,6 +49,7 @@ COSMOS_ENDPOINT=$(az cosmosdb show -n "cosmos-${PROJECT_NAME}" -g "$RESOURCE_GRO
 PG_FQDN=$(az postgres flexible-server show -n "pgflex-${PROJECT_NAME}" -g "$RESOURCE_GROUP" --query fullyQualifiedDomainName -o tsv)
 BACKEND_FQDN=$(az containerapp show -n "$BACKEND_APP" -g "$RESOURCE_GROUP" --query "properties.configuration.ingress.fqdn" -o tsv)
 OPENAI_ENDPOINT=$(az cognitiveservices account show -n "aifoundry-${PROJECT_NAME}" -g "$RESOURCE_GROUP" --query "properties.endpoint" -o tsv)
+SEARCH_ENDPOINT=$(az search service show -n "search-${PROJECT_NAME}" -g "$RESOURCE_GROUP" --query "endpoint" -o tsv 2>/dev/null || echo "")
 
 # Auth settings (prefer Terraform outputs so deploy always matches infra state)
 AUTH_MODE="${AUTH_MODE:-$(terraform -chdir="$PROJECT_ROOT/infra" output -raw auth_mode 2>/dev/null || echo entra)}"
@@ -120,7 +121,9 @@ deploy_backend() {
       "PG_AAD_PRINCIPAL_NAME=id-${PROJECT_NAME}" \
       "AZURE_OPENAI_ENDPOINT=${OPENAI_ENDPOINT}" \
       "AZURE_OPENAI_DEPLOYMENT_NAME=gpt-4o-mini" \
-      "AZURE_OPENAI_EMBEDDING_DEPLOYMENT_NAME=text-embedding-3-large"
+      "AZURE_OPENAI_EMBEDDING_DEPLOYMENT_NAME=text-embedding-3-large" \
+      "AZURE_SEARCH_ENDPOINT=${SEARCH_ENDPOINT}" \
+      "AZURE_SEARCH_KNOWLEDGE_BASE_NAME=customer-support-kb"
   ok "Backend container app updated"
 
   # Ensure ingress target port matches uvicorn

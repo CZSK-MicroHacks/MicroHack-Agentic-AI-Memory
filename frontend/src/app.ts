@@ -79,6 +79,7 @@ export class NativeApp extends LitElement {
   @state() private promptContent: string | null = null;
   @state() private promptLoading = false;
   @state() private promptCopied = false;
+  @state() private ragEnabled = true;
   @state() private selectedMockUserId = getCurrentMockUserId();
 
   private buildId = ((window as any).__APP_CONFIG__?.buildId ?? '').trim();
@@ -615,6 +616,23 @@ export class NativeApp extends LitElement {
     }
     .bubble strong { font-weight: 600; }
 
+    /* Citation annotation badges */
+    .citation-ref {
+      display: inline-flex;
+      align-items: center;
+      gap: 2px;
+      font-size: 0.75em;
+      font-weight: 600;
+      line-height: 1;
+      vertical-align: super;
+      padding: 1px 5px;
+      border-radius: 8px;
+      background: light-dark(var(--p-90), var(--p-30));
+      color: light-dark(var(--p-30), var(--p-90));
+      cursor: default;
+      text-decoration: none;
+    }
+
     /* User messages — subtle background */
     .msg.user .bubble {
       background: none;
@@ -731,6 +749,17 @@ export class NativeApp extends LitElement {
     }
     .send-btn:disabled { opacity: 0.3; cursor: default; }
     .send-btn:not(:disabled):hover { opacity: 0.85; }
+    .rag-toggle {
+      display: flex; align-items: center; gap: 6px;
+      max-width: 768px; margin: 6px auto 0;
+      font-size: 12px; color: light-dark(var(--n-50), var(--n-60));
+      user-select: none;
+    }
+    .rag-toggle input[type="checkbox"] {
+      accent-color: light-dark(var(--p-40), var(--p-70));
+      width: 14px; height: 14px; margin: 0; cursor: pointer;
+    }
+    .rag-toggle label { cursor: pointer; }
     .input-footer {
       text-align: center; margin-top: 8px;
       font-size: 11px; color: light-dark(var(--n-60), var(--n-50));
@@ -1300,7 +1329,15 @@ export class NativeApp extends LitElement {
 
   private parseMarkdown(text: string): string {
     if (!text) return '';
-    const rendered = marked.parse(text, { async: false, breaks: true }) as string;
+    // Transform 【idx:ref†source_name】 annotation markers into styled badges
+    const annotated = text.replace(
+      /\u3010(\d+):(\d+)\u2020([^\u3011]*)\u3011/g,
+      (_match, idx, _ref, name) => {
+        const label = (name.trim() || `[${idx}]`).replace(/"/g, '&quot;');
+        return `<span class="citation-ref" title="${label}">${Number(idx) + 1}</span>`;
+      }
+    );
+    const rendered = marked.parse(annotated, { async: false, breaks: true }) as string;
     return DOMPurify.sanitize(rendered);
   }
 
@@ -1833,7 +1870,7 @@ export class NativeApp extends LitElement {
     };
 
     try {
-      const result = await this.client.sendMessage(text, this.sessionId, {
+      const result = await this.client.sendMessage(text, this.sessionId, this.ragEnabled, {
         onTextContent: (delta) => {
           const cur = this.messages.find(m => m.id === assistantId)!;
           updateAssistant({ content: cur.content + delta });
@@ -2547,6 +2584,11 @@ export class NativeApp extends LitElement {
             <span class="material-symbols-outlined" style="font-size:22px">send</span>
           </button>
         </form>
+        <div class="rag-toggle">
+          <input type="checkbox" id="rag-toggle" .checked=${this.ragEnabled}
+            @change=${(e: Event) => { this.ragEnabled = (e.target as HTMLInputElement).checked; }} />
+          <label for="rag-toggle">Knowledge Base Search (RAG)</label>
+        </div>
         <div class="input-footer">Powered by A2UI — tool results rendered as interactive surfaces</div>
       </div>
     `;

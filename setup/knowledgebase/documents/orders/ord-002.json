@@ -1,0 +1,20 @@
+[
+  {
+    "id": "ord-002-overview",
+    "order_id": "ORD-002",
+    "category": "order_detail",
+    "page_chunk": "Order ORD-002 was placed on January 20, 2026 by the customer. The order contains 1 item: Ergonomic Office Chair (Model: ErgoMax Pro, Color: Gray Mesh, Qty: 1, Price: $599.00). Order subtotal: $599.00. Shipping: Free (orders over $500 qualify for free shipping). Tax: $49.12. Order total: $648.12. Payment method: Mastercard ending in 8888."
+  },
+  {
+    "id": "ord-002-shipping",
+    "order_id": "ORD-002",
+    "category": "shipping",
+    "page_chunk": "Order ORD-002 is currently being processed at the warehouse. Status: Processing. The item is a large/heavy shipment and requires freight handling. Estimated ship date: January 22, 2026. Estimated delivery date: January 28, 2026. Shipping method: Standard freight delivery. Shipping address: 456 Oak Avenue, Suite 200, Portland, OR 97201. Note: Freight deliveries require signature upon receipt and a delivery appointment will be scheduled by the carrier."
+  },
+  {
+    "id": "ord-002-product",
+    "order_id": "ORD-002",
+    "category": "product",
+    "page_chunk": "Ergonomic Office Chair (ErgoMax Pro): Professional-grade ergonomic chair with adjustable lumbar support, 4D armrests, breathable mesh back, and seat depth adjustment. Weight capacity: 300 lbs. Includes headrest attachment. Assembly required (estimated 45 minutes, tools included). Warranty: 5-year warranty covering frame, mechanism, and fabric. 30-day comfort guarantee — if not satisfied, return for full refund. Chair dimensions: 27\"W x 27\"D x 45-50\"H."
+  }
+]

@@ -1,0 +1,22 @@
+[
+  {
+    "id": "policy-eligibility",
+    "section": "eligibility",
+    "page_chunk": "Return Eligibility Policy: Items may be returned within 30 days of delivery for a full refund. Products must be in their original packaging, unused, and in resalable condition. Electronics must include all original accessories, cables, and documentation. Opened software, downloadable products, and gift cards are non-returnable. Items marked as 'Final Sale' at the time of purchase cannot be returned. Furniture items (including office chairs and desks) have a 30-day comfort guarantee and may be returned even if assembled, provided they are in good condition."
+  },
+  {
+    "id": "policy-process",
+    "section": "process",
+    "page_chunk": "Return Process: To initiate a return, contact customer support with your order ID and reason for return. A Return Merchandise Authorization (RMA) number will be issued within 1 business day. Pack the item securely in its original packaging (or equivalent protective packaging). Affix the prepaid return shipping label (provided via email after RMA approval). Drop off the package at any authorized carrier location. Standard return shipping is free for defective items. For non-defective returns, a $7.99 return shipping fee is deducted from the refund. Freight items (over 50 lbs) require scheduled carrier pickup — customer support will arrange this at no additional cost."
+  },
+  {
+    "id": "policy-refunds",
+    "section": "refunds",
+    "page_chunk": "Refund Policy: Refunds are processed within 5-7 business days after the returned item is received and inspected at our facility. Refunds are issued to the original payment method. Credit card refunds may take an additional 3-5 business days to appear on your statement. PayPal refunds are typically reflected within 1-2 business days. If the item is returned in damaged or used condition, a restocking fee of up to 15% may be applied. For defective items, a full refund is issued including original shipping charges. Exchange option: instead of a refund, customers may request a direct exchange for the same item (different color/size) or store credit valued at 110% of the purchase price."
+  },
+  {
+    "id": "policy-exceptions",
+    "section": "exceptions",
+    "page_chunk": "Return Exceptions and Special Cases: Holiday purchases (November 15 – December 31) have an extended return window until January 31 of the following year. Warranty claims beyond the 30-day return window are handled separately through the manufacturer warranty process — contact support with your order ID and proof of defect. Bulk orders (10+ units of the same item) have a modified return policy: up to 20% of the order quantity may be returned within 30 days; larger returns require manager approval. International orders: return shipping is the customer's responsibility; customs duties paid are non-refundable. Price adjustment: if an item's price drops within 14 days of your purchase, contact support for a price match credit."
+  }
+]

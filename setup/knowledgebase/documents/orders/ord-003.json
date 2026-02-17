@@ -1,0 +1,20 @@
+[
+  {
+    "id": "ord-003-overview",
+    "order_id": "ORD-003",
+    "category": "order_detail",
+    "page_chunk": "Order ORD-003 was placed on January 10, 2026 by the customer. The order contains 3 items: (1) Mechanical Keyboard (Model: KeyPro TKL, Switch: Cherry MX Brown, Qty: 1, Price: $129.99), (2) Desk Mouse Pad XXL (900x400mm, Qty: 1, Price: $24.99), and (3) Webcam HD 1080p (Model: ClearView Pro, Qty: 1, Price: $79.99). Order subtotal: $234.97. Shipping: $5.99 (Standard). Tax: $19.28. Order total: $260.24. Payment method: PayPal (email: customer@email.com)."
+  },
+  {
+    "id": "ord-003-shipping",
+    "order_id": "ORD-003",
+    "category": "shipping",
+    "page_chunk": "Order ORD-003 was delivered on January 20, 2026. Tracking number: 1Z999AA3. Shipped via FedEx Ground from the Dallas fulfillment center on January 13, 2026. Delivery confirmed: signed by recipient at front door. Shipping address: 789 Pine Road, Austin, TX 78701. All 3 items were delivered in a single package."
+  },
+  {
+    "id": "ord-003-product",
+    "order_id": "ORD-003",
+    "category": "product",
+    "page_chunk": "Mechanical Keyboard (KeyPro TKL): Tenkeyless mechanical keyboard with Cherry MX Brown switches for a tactile, quiet typing experience. Features RGB per-key backlighting, USB-C detachable cable, PBT double-shot keycaps, and N-key rollover. Warranty: 2-year manufacturer warranty. Desk Mouse Pad XXL: Extended mouse pad (900x400mm) with micro-weave cloth surface and non-slip rubber base. Machine washable. Warranty: 6-month warranty. Webcam HD 1080p (ClearView Pro): Full HD webcam with auto-focus, built-in dual microphones, and privacy shutter. Compatible with all major video conferencing platforms. Warranty: 1-year warranty."
+  }
+]

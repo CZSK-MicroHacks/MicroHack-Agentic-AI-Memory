@@ -36,6 +36,7 @@ from auth import User, get_current_user
 from conversation_history import ConversationHistoryStore
 from conversation_memory import ConversationMemoryStore
 from memory_agent import MemoryAgent
+from rag_client import RAGClient
 from user_profile_memory import UserProfileMemoryStore
 from profile_agent import ProfileAgent
 
@@ -387,6 +388,9 @@ memory_store = ConversationMemoryStore()
 # Initialize the user profile memory store (Cosmos DB)
 profile_store = UserProfileMemoryStore()
 
+# Initialize the RAG client (Azure AI Search knowledge base)
+rag_client = RAGClient()
+
 
 # =============================================================================
 # Tools
@@ -468,6 +472,48 @@ def get_order_status(
     }
 
 
+@tool
+async def do_rag(
+    query: Annotated[str, Field(description="Natural-language question to search the knowledge base for")],
+) -> dict:
+    """Search the company knowledge base for detailed information about orders,
+    products, shipping, and return/refund policies.
+
+    Use this tool when you need:
+    - Detailed product specifications or descriptions
+    - Shipping carrier, weight, or packaging information
+    - Return policy rules, eligibility windows, or refund timelines
+    - Any information beyond the basic order status
+
+    Do NOT use this tool for a simple order status check — use
+    get_order_status for that instead.
+    """
+    logger.info("Running do_rag tool with query: %s", query)
+    try:
+        result = await rag_client.retrieve(query=query)
+    except Exception as e:
+        logger.error("do_rag tool failed: %s", e, exc_info=True)
+        return {"content": f"Knowledge base search failed: {e}", "citations": []}
+
+    if not result.content and not result.citations:
+        return {"content": "No relevant information found in the knowledge base.", "citations": []}
+
+    citations_list = []
+    for i, cit in enumerate(result.citations):
+        citations_list.append({
+            "search_idx": i,
+            "ref_id": cit.ref_id,
+            "source_name": cit.source_name,
+            "content": cit.content,
+            "annotation": f"\u3010{i}:{cit.ref_id}\u2020{cit.source_name}\u3011",
+        })
+
+    return {
+        "content": result.content,
+        "citations": citations_list,
+    }
+
+
 # =============================================================================
 # Agent Configuration
 # =============================================================================
@@ -484,25 +530,37 @@ agent = ChatAgent(
     name="CustomerSupportAgent",
     instructions=CUSTOMER_SUPPORT_PROMPT,
     chat_client=chat_client,
-    tools=[get_order_status, check_memory],
+    tools=[get_order_status, check_memory, do_rag],
 )
 
 
-def _build_personalized_agent(user_profile: dict[str, Any] | None) -> ChatAgent:
+def _build_personalized_agent(
+    user_profile: dict[str, Any] | None,
+    *,
+    rag_enabled: bool = True,
+) -> ChatAgent:
     """Return an agent whose system prompt is enriched with the user profile.
 
     If *user_profile* is ``None`` or empty the global default agent is
     returned so we avoid an unnecessary re-render.
     """
-    if not user_profile:
-        return agent
+    tools = [get_order_status, check_memory]
+    if rag_enabled:
+        tools.append(do_rag)
 
-    personalized_prompt = load_prompt("customer_support.j2", user_profile=user_profile)
+    if not user_profile and rag_enabled:
+        return agent  # global default already has all tools
+
+    prompt = load_prompt(
+        "customer_support.j2",
+        user_profile=user_profile,
+        rag_enabled=rag_enabled,
+    )
     return ChatAgent(
         name="CustomerSupportAgent",
-        instructions=personalized_prompt,
+        instructions=prompt,
         chat_client=chat_client,
-        tools=[get_order_status, check_memory],
+        tools=tools,
     )
 
 
@@ -604,6 +662,10 @@ class ChatRequest(BaseModel):
     thread_id: str | None = Field(
         default=None,
         description="Session/thread ID. If not provided, creates a new session."
+    )
+    rag_enabled: bool = Field(
+        default=True,
+        description="Whether knowledge base search (RAG) is enabled for this request."
     )
 
 
@@ -1444,7 +1506,7 @@ async def chat(
 
     # Fetch user profile to personalise the agent's system prompt
     user_profile = await profile_store.get_profile(current_user.user_id)
-    personalized = _build_personalized_agent(user_profile)
+    personalized = _build_personalized_agent(user_profile, rag_enabled=request.rag_enabled)
 
     return StreamingResponse(
         stream_agent_response(user_message, thread, session_id, current_user.user_id, personalized),

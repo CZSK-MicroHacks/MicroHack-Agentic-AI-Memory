@@ -26,3 +26,24 @@ resource "azurerm_role_assignment" "mi_ai_user" {
   role_definition_name = "Azure AI User"
   principal_id         = azurerm_user_assigned_identity.app.principal_id
 }
+
+# Search Index Data Reader — allows backend MI to query AI Search indexes
+resource "azurerm_role_assignment" "mi_search_index_data_reader" {
+  scope                = azurerm_search_service.main.id
+  role_definition_name = "Search Index Data Reader"
+  principal_id         = azurerm_user_assigned_identity.app.principal_id
+}
+
+# Search Service Contributor — allows backend MI to call KB retrieve API
+resource "azurerm_role_assignment" "mi_search_service_contributor" {
+  scope                = azurerm_search_service.main.id
+  role_definition_name = "Search Service Contributor"
+  principal_id         = azurerm_user_assigned_identity.app.principal_id
+}
+
+# Cognitive Services User — allows AI Search MI to call Azure OpenAI for vectorization
+resource "azurerm_role_assignment" "search_cognitive_services_user" {
+  scope                = azapi_resource.ai_foundry.id
+  role_definition_name = "Cognitive Services User"
+  principal_id         = azurerm_search_service.main.identity[0].principal_id
+}

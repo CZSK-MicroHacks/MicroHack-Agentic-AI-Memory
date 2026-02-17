@@ -117,6 +117,22 @@ variable "postgres_password_auth_enabled" {
 
 
 # -----------------------------------------------------------------------------
+# Azure AI Search
+# -----------------------------------------------------------------------------
+
+variable "search_sku" {
+  description = "Azure AI Search SKU (standard required for semantic ranker / agentic retrieval)"
+  type        = string
+  default     = "standard"
+}
+
+variable "search_location" {
+  description = "Azure region for AI Search (may differ from primary location due to capacity)"
+  type        = string
+  default     = "westus2"
+}
+
+# -----------------------------------------------------------------------------
 # Cosmos DB
 # -----------------------------------------------------------------------------
 
