@@ -64,6 +64,10 @@ resource "azurerm_container_app" "backend" {
         name  = "AZURE_SEARCH_KNOWLEDGE_BASE_NAME"
         value = "customer-support-kb"
       }
+      env {
+        name  = "AZURE_SEARCH_ORDERS_INDEX"
+        value = "orders"
+      }
 
       # Cosmos DB
       env {

@@ -150,6 +150,9 @@ converters.set('do_rag', (result: unknown, surfaceId: string): A2UIMessage[] => 
   );
 });
 
+/* Re-use the same converter for classic RAG (identical response format) */
+converters.set('do_classic_rag', converters.get('do_rag')!);
+
 /* ────────────────────────────────────────────────────────────
  * Generic fallback converter
  *

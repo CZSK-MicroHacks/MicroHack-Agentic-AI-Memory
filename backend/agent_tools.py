@@ -16,6 +16,7 @@ from pydantic import Field
 
 from agent_framework import tool
 
+from classic_rag_client import ClassicRAGClient
 from conversation_memory import ConversationMemoryStore
 from memory_agent import MemoryAgent
 from rag_client import RAGClient
@@ -64,11 +65,13 @@ class AgentTools:
         memory_agent: MemoryAgent,
         profile_store: UserProfileMemoryStore,
         rag_client: RAGClient,
+        classic_rag_client: ClassicRAGClient,
     ) -> None:
         self._memory_store = memory_store
         self._memory_agent = memory_agent
         self._profile_store = profile_store
         self._rag_client = rag_client
+        self._classic_rag_client = classic_rag_client
         self._current_user_id: contextvars.ContextVar[str] = contextvars.ContextVar(
             "_current_user_id"
         )
@@ -188,6 +191,46 @@ class AgentTools:
         }
 
     @tool
+    async def do_classic_rag(
+        self,
+        query: Annotated[str, Field(description="Natural-language question to search the orders index for")],
+    ) -> dict:
+        """Search the orders knowledge base using classic hybrid search (text + vector + semantic ranking).
+
+        This tool searches ONLY the orders index. Use it for:
+        - Product details within specific orders
+        - Shipping carrier, weight, or packaging information for orders
+        - Order-specific information beyond the basic status
+
+        This tool does NOT cover return/refund policies — those require
+        the agentic RAG tool which spans multiple knowledge sources.
+        """
+        logger.info("Running do_classic_rag tool with query: %s", query)
+        try:
+            result = await self._classic_rag_client.search(query=query)
+        except Exception as e:
+            logger.error("do_classic_rag tool failed: %s", e, exc_info=True)
+            return {"content": f"Knowledge base search failed: {e}", "citations": []}
+
+        if not result.content and not result.citations:
+            return {"content": "No relevant information found in the knowledge base.", "citations": []}
+
+        citations_list = []
+        for i, cit in enumerate(result.citations):
+            citations_list.append({
+                "search_idx": i,
+                "ref_id": cit.ref_id,
+                "source_name": cit.source_name,
+                "content": cit.content,
+                "annotation": f"\u3010{i}:{cit.ref_id}\u2020{cit.source_name}\u3011",
+            })
+
+        return {
+            "content": result.content,
+            "citations": citations_list,
+        }
+
+    @tool
     async def update_user_profile(
         self,
         basic_info: Annotated[dict[str, Any] | None, Field(
@@ -279,9 +322,14 @@ class AgentTools:
 
     @property
     def all(self) -> list:
-        """All tools including RAG."""
+        """All tools including agentic RAG."""
         return [self.get_order_status, self.check_memory, self.do_rag, self.update_user_profile]
 
-    def without_rag(self) -> list:
-        """Tool list excluding do_rag (for rag_enabled=False)."""
-        return [self.get_order_status, self.check_memory, self.update_user_profile]
+    def for_rag_mode(self, rag_mode: str) -> list:
+        """Return tool list for the given RAG mode."""
+        base = [self.get_order_status, self.check_memory, self.update_user_profile]
+        if rag_mode == "agentic":
+            return base + [self.do_rag]
+        elif rag_mode == "classic":
+            return base + [self.do_classic_rag]
+        return base  # "none"

@@ -79,7 +79,7 @@ export class NativeApp extends LitElement {
   @state() private promptContent: string | null = null;
   @state() private promptLoading = false;
   @state() private promptCopied = false;
-  @state() private ragEnabled = true;
+  @state() private ragMode: 'none' | 'agentic' | 'classic' = 'agentic';
   @state() private selectedMockUserId = getCurrentMockUserId();
 
   private buildId = ((window as any).__APP_CONFIG__?.buildId ?? '').trim();
@@ -750,16 +750,18 @@ export class NativeApp extends LitElement {
     .send-btn:disabled { opacity: 0.3; cursor: default; }
     .send-btn:not(:disabled):hover { opacity: 0.85; }
     .rag-toggle {
-      display: flex; align-items: center; gap: 6px;
+      display: flex; align-items: center; gap: 12px;
       max-width: 768px; margin: 6px auto 0;
       font-size: 12px; color: light-dark(var(--n-50), var(--n-60));
       user-select: none;
     }
-    .rag-toggle input[type="checkbox"] {
-      accent-color: light-dark(var(--p-40), var(--p-70));
-      width: 14px; height: 14px; margin: 0; cursor: pointer;
+    .rag-toggle label {
+      display: flex; align-items: center; gap: 4px; cursor: pointer;
     }
-    .rag-toggle label { cursor: pointer; }
+    .rag-toggle input[type="radio"] {
+      accent-color: light-dark(var(--p-40), var(--p-70));
+      width: 13px; height: 13px; margin: 0; cursor: pointer;
+    }
     .input-footer {
       text-align: center; margin-top: 8px;
       font-size: 11px; color: light-dark(var(--n-60), var(--n-50));
@@ -1873,7 +1875,7 @@ export class NativeApp extends LitElement {
     };
 
     try {
-      const result = await this.client.sendMessage(text, this.sessionId, this.ragEnabled, {
+      const result = await this.client.sendMessage(text, this.sessionId, this.ragMode, {
         onTextContent: (delta) => {
           const cur = this.messages.find(m => m.id === assistantId)!;
           updateAssistant({ content: cur.content + delta });
@@ -2588,9 +2590,22 @@ export class NativeApp extends LitElement {
           </button>
         </form>
         <div class="rag-toggle">
-          <input type="checkbox" id="rag-toggle" .checked=${this.ragEnabled}
-            @change=${(e: Event) => { this.ragEnabled = (e.target as HTMLInputElement).checked; }} />
-          <label for="rag-toggle">Knowledge Base Search (RAG)</label>
+          <span style="margin-right: 2px">RAG:</span>
+          <label>
+            <input type="radio" name="rag-mode" value="none"
+              .checked=${this.ragMode === 'none'}
+              @change=${() => { this.ragMode = 'none'; }} /> Off
+          </label>
+          <label>
+            <input type="radio" name="rag-mode" value="agentic"
+              .checked=${this.ragMode === 'agentic'}
+              @change=${() => { this.ragMode = 'agentic'; }} /> Agentic
+          </label>
+          <label>
+            <input type="radio" name="rag-mode" value="classic"
+              .checked=${this.ragMode === 'classic'}
+              @change=${() => { this.ragMode = 'classic'; }} /> Classic
+          </label>
         </div>
         <div class="input-footer">Powered by A2UI — tool results rendered as interactive surfaces</div>
       </div>

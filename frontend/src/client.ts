@@ -372,7 +372,7 @@ export class AGUIClient {
   async sendMessage(
     message: string,
     threadId: string | null,
-    ragEnabled: boolean,
+    ragMode: string,
     callbacks: StreamCallbacks,
   ): Promise<{ sessionId: string | null }> {
     const authHeaders = await this.authHeaders();
@@ -382,7 +382,7 @@ export class AGUIClient {
       body: JSON.stringify({
         messages: [{ role: 'user', content: message }],
         thread_id: threadId,
-        rag_enabled: ragEnabled,
+        rag_mode: ragMode,
       }),
     });
 

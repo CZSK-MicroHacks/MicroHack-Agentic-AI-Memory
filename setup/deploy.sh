@@ -123,7 +123,8 @@ deploy_backend() {
       "AZURE_OPENAI_DEPLOYMENT_NAME=gpt-4o-mini" \
       "AZURE_OPENAI_EMBEDDING_DEPLOYMENT_NAME=text-embedding-3-large" \
       "AZURE_SEARCH_ENDPOINT=${SEARCH_ENDPOINT}" \
-      "AZURE_SEARCH_KNOWLEDGE_BASE_NAME=customer-support-kb"
+      "AZURE_SEARCH_KNOWLEDGE_BASE_NAME=customer-support-kb" \
+      "AZURE_SEARCH_ORDERS_INDEX=orders"
   ok "Backend container app updated"
 
   # Ensure ingress target port matches uvicorn

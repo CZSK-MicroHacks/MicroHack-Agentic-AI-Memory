@@ -32,6 +32,7 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
 from auth import User, get_current_user
+from classic_rag_client import ClassicRAGClient
 from conversation_history import ConversationHistoryStore
 from conversation_memory import ConversationMemoryStore
 from memory_agent import MemoryAgent
@@ -391,6 +392,9 @@ profile_store = UserProfileMemoryStore()
 # Initialize the RAG client (Azure AI Search knowledge base)
 rag_client = RAGClient()
 
+# Initialize the classic RAG client (Azure AI Search standard hybrid search)
+classic_rag_client = ClassicRAGClient()
+
 
 # =============================================================================
 # Agent Configuration
@@ -415,6 +419,7 @@ agent_tools = AgentTools(
     memory_agent=memory_agent,
     profile_store=profile_store,
     rag_client=rag_client,
+    classic_rag_client=classic_rag_client,
 )
 
 # Configure the default agent (no profile — used as fallback)
@@ -429,22 +434,22 @@ agent = ChatAgent(
 def _build_personalized_agent(
     user_profile: dict[str, Any] | None,
     *,
-    rag_enabled: bool = True,
+    rag_mode: str = "agentic",
 ) -> ChatAgent:
     """Return an agent whose system prompt is enriched with the user profile.
 
     If *user_profile* is ``None`` or empty the global default agent is
     returned so we avoid an unnecessary re-render.
     """
-    tools = agent_tools.all if rag_enabled else agent_tools.without_rag()
+    tools = agent_tools.for_rag_mode(rag_mode)
 
-    if not user_profile and rag_enabled:
+    if not user_profile and rag_mode == "agentic":
         return agent  # global default already has all tools
 
     prompt = load_prompt(
         "customer_support.j2",
         user_profile=user_profile,
-        rag_enabled=rag_enabled,
+        rag_mode=rag_mode,
     )
     return ChatAgent(
         name="CustomerSupportAgent",
@@ -546,9 +551,9 @@ class ChatRequest(BaseModel):
         default=None,
         description="Session/thread ID. If not provided, creates a new session."
     )
-    rag_enabled: bool = Field(
-        default=True,
-        description="Whether knowledge base search (RAG) is enabled for this request."
+    rag_mode: str = Field(
+        default="agentic",
+        description="RAG mode: 'none', 'agentic' (knowledge base retrieve), or 'classic' (hybrid search)",
     )
 
 
@@ -1389,7 +1394,8 @@ async def chat(
 
     # Fetch user profile to personalise the agent's system prompt
     user_profile = await profile_store.get_profile(current_user.user_id)
-    personalized = _build_personalized_agent(user_profile, rag_enabled=request.rag_enabled)
+    rag_mode = request.rag_mode if request.rag_mode in ("none", "agentic", "classic") else "agentic"
+    personalized = _build_personalized_agent(user_profile, rag_mode=rag_mode)
 
     return StreamingResponse(
         stream_agent_response(user_message, thread, session_id, current_user.user_id, personalized),
