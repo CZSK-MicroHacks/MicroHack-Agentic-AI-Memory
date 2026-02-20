@@ -1,9 +1,9 @@
-subscription_id         = "de281c5e-5d60-4fc1-b905-c91caf45e624"
+subscription_id         = "673af34d-6b28-41dc-bc7b-f507418045e6"
 resource_group_name     = "rg-mh-ai-memory"
 location                = "eastus2"
-project_name            = "mhaimem"
+project_name            = "kubicaaimem"
 postgres_admin_password = "P@ssw0rd2026!"
 postgres_location       = "northcentralus"
 postgres_password_auth_enabled = true
-frontend_redirect_uri = "https://ca-frontend-mhaimem.happytree-c6a96aa3.eastus2.azurecontainerapps.io/"
+frontend_redirect_uri = ""
 
