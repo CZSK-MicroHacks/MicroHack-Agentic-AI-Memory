@@ -1,6 +1,7 @@
 import ReactMarkdown from 'react-markdown';
 import type { DocumentVersion } from '../types';
 import { AGENT_COLORS } from '../types';
+import { icons } from './icons';
 
 interface DocumentViewerProps {
   content: string;
@@ -21,7 +22,9 @@ export default function DocumentViewer({ content, versions, selectedVersion, onS
     <div className="flex flex-col h-full">
       <div className="px-4 py-3 border-b border-gray-200 bg-gray-50">
         <div className="flex items-center justify-between">
-          <h2 className="text-sm font-semibold text-gray-600 uppercase tracking-wide">📄 Shared Document</h2>
+          <h2 className="text-sm font-semibold text-gray-600 uppercase tracking-wide flex items-center gap-1.5">
+            <img src={icons.documentIcon} alt="" className="w-10 h-10" /> Shared Document
+          </h2>
           {versions.length > 0 && (
             <span className="text-xs text-gray-500">
               v{isLatest ? versions.length : selectedVersion}

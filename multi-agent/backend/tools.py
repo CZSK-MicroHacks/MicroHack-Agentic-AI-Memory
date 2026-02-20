@@ -3,20 +3,20 @@
 Scratchpad tools for the multi-agent travel planning system.
 
 Two tool sets:
-- FacilitatorTools: create tasks, check status, dispatch agents, read document
-- SpecialistTools: read/complete tasks, read/write document
+- FacilitatorTools: create tasks, check status, read/consolidate document
+- SpecialistTools: read/complete tasks, write sections to document
 """
 
 from __future__ import annotations
 
 import json
 import logging
-from typing import Annotated, Any
+from typing import Annotated, Any, Literal
 
 from pydantic import Field
 from agent_framework import tool
 
-from scratchpad import TaskBoard, SharedDocument
+from scratchpad import TaskBoard, SharedDocument, SLOT_ORDER, SLOT_LABELS, TimeSlot
 from events import EventEmitter
 
 logger = logging.getLogger("travel.tools")
@@ -64,37 +64,42 @@ class SpecialistTools:
 
     @tool
     async def read_document(self) -> str:
-        """Read the current version of the shared travel plan document."""
+        """Read the current shared travel plan document to see what other agents have contributed."""
         content = self._document.read_latest()
         if not content:
             return "The shared document is empty. No content has been written yet."
         return content
 
     @tool
-    async def write_to_document(
+    async def write_section(
         self,
-        content: Annotated[str, Field(description="Your contribution to the travel plan. Write your recommendations placed into the itinerary timeline (e.g., morning/afternoon/evening blocks). This will be appended to the current document.")],
-        change_description: Annotated[str, Field(description="Brief description of what you added (e.g., 'Added morning sightseeing recommendations for Day 1')")],
+        day: Annotated[int, Field(description="Day number (1, 2, 3...). Use 0 for general info not tied to a specific day (e.g., airport transfer, accommodation, transit passes).")],
+        time_slot: Annotated[Literal["general", "morning", "afternoon", "evening", "night"], Field(description="Time slot within the day. Use 'general' for day-level info, 'morning' for 9-12, 'afternoon' for 12-18, 'evening' for 18-22, 'night' for 22+.")],
+        content: Annotated[str, Field(description="Your recommendations for this time slot as markdown bullet points. Only write YOUR expertise area. Be specific with timing, names, and practical details.")],
     ) -> str:
-        """Add your contribution to the shared travel plan document. Your content will be appended to the existing document. Multiple agents write concurrently, so focus on YOUR expertise area only."""
-        version = self._document.append(content, self._agent_name, change_description)
+        """Write your recommendations into a specific day and time slot of the shared itinerary.
+
+        Multiple agents can write to the same slot — entries are collected as candidates.
+        The facilitator will merge them later. Focus on YOUR expertise only.
+        """
+        version = self._document.write_section(day, time_slot, content, self._agent_name)
+        rendered = self._document.render(show_agent_tags=True)
         await self._emitter.emit("document_updated", {
-            "version": version.version,
-            "author": version.author,
-            "timestamp": version.timestamp,
-            "change_description": version.change_description,
-            "content": version.content,
+            "version": version,
+            "author": self._agent_name,
+            "content": rendered,
+            "change_description": f"{self._agent_name} added to Day {day} / {time_slot}",
         })
-        logger.info("Document updated by %s: version %d", self._agent_name, version.version)
-        return f"Contribution added to document (version {version.version}). Change: {change_description}"
+        logger.info("Document updated by %s: Day %d / %s (v%d)", self._agent_name, day, time_slot, version)
+        return f"Written to Day {day} / {time_slot} (document v{version})."
 
     @property
     def all(self) -> list:
-        return [self.read_tasks, self.complete_task, self.read_document, self.write_to_document]
+        return [self.read_tasks, self.complete_task, self.read_document, self.write_section]
 
 
 class FacilitatorTools:
-    """Tools for the facilitator agent to manage tasks and read the document."""
+    """Tools for the facilitator agent to manage tasks and read/consolidate the document."""
 
     def __init__(self, task_board: TaskBoard, document: SharedDocument, emitter: EventEmitter) -> None:
         self._task_board = task_board
@@ -108,21 +113,25 @@ class FacilitatorTools:
     ) -> str:
         """Create tasks on the shared task board and assign them to specialist agents."""
         logger.info("create_tasks called with type=%s, value=%s", type(tasks_json).__name__, repr(tasks_json)[:500])
-        if isinstance(tasks_json, list):
-            tasks = tasks_json
-        elif isinstance(tasks_json, str):
-            tasks = json.loads(tasks_json)
-        else:
-            tasks = json.loads(str(tasks_json))
-        created = self._task_board.create_tasks(tasks)
-        task_dicts = [
-            {"id": t.id, "text": t.text, "assigned_to": t.assigned_to, "finished": False}
-            for t in created
-        ]
-        await self._emitter.emit("tasks_created", {"tasks": task_dicts})
-        logger.info("Created %d tasks on the task board", len(created))
-        summary = "\n".join(f"  Task {t.id}: [{t.assigned_to}] {t.text}" for t in created)
-        return f"Created {len(created)} tasks:\n{summary}"
+        try:
+            if isinstance(tasks_json, list):
+                tasks = tasks_json
+            elif isinstance(tasks_json, str):
+                tasks = json.loads(tasks_json)
+            else:
+                tasks = json.loads(str(tasks_json))
+            created = self._task_board.create_tasks(tasks)
+            task_dicts = [
+                {"id": t.id, "text": t.text, "assigned_to": t.assigned_to, "finished": False}
+                for t in created
+            ]
+            await self._emitter.emit("tasks_created", {"tasks": task_dicts})
+            logger.info("Created %d tasks on the task board", len(created))
+            summary = "\n".join(f"  Task {t.id}: [{t.assigned_to}] {t.text}" for t in created)
+            return f"Created {len(created)} tasks:\n{summary}"
+        except Exception as e:
+            logger.error("create_tasks FAILED: %s", e, exc_info=True)
+            raise
 
     @tool
     async def get_plan_status(self) -> str:
@@ -142,31 +151,44 @@ class FacilitatorTools:
 
     @tool
     async def read_document(self) -> str:
-        """Read the current shared travel plan document compiled by all agents."""
+        """Read the current shared itinerary with agent tags showing who contributed each entry."""
         content = self._document.read_latest()
         if not content:
             return "The shared document is empty."
-        version = self._document.get_latest_version_number()
+        version = self._document.get_version()
         return f"[Document v{version}]\n\n{content}"
 
     @tool
-    async def rewrite_document(self, content: str) -> str:
-        """Rewrite the entire shared document. Use this ONLY in your final review step
-        to merge and reorganize all agent contributions into a clean, unified itinerary.
-        Do NOT use this during the planning phase — agents append their own contributions.
+    async def consolidate_section(
+        self,
+        day: Annotated[int, Field(description="Day number (0 for general info, 1+ for specific days)")],
+        time_slot: Annotated[Literal["general", "morning", "afternoon", "evening", "night"], Field(description="Time slot to consolidate")],
+        content: Annotated[str, Field(description="The merged, clean content for this slot — combining the best from all agent contributions into a unified narrative with specific times, places, and practical details.")],
+    ) -> str:
+        """Merge all agent contributions for a specific day/time-slot into a single clean entry.
 
-        Args:
-            content: The complete, reorganized itinerary document.
+        Use this after agents have finished to resolve duplicate or conflicting entries
+        within a slot. Replaces ALL existing entries in that slot with your merged version.
         """
-        self._document.write(content, author="facilitator", change_description="Final merge and reorganization of all agent contributions")
-        version = self._document.get_latest_version_number()
+        version = self._document.consolidate_section(day, time_slot, content)
+        rendered = self._document.render(show_agent_tags=False)
         await self._emitter.emit("document_updated", {
             "version": version,
-            "content": content,
             "author": "facilitator",
+            "content": rendered,
+            "change_description": f"Consolidated Day {day} / {time_slot}",
         })
-        return f"Document rewritten (v{version}). Final merged itinerary saved."
+        logger.info("Facilitator consolidated Day %d / %s (v%d)", day, time_slot, version)
+        return f"Consolidated Day {day} / {time_slot} (document v{version})."
+
+    @tool
+    async def read_document_clean(self) -> str:
+        """Read the document without agent tags — use this to preview the final output."""
+        content = self._document.render_clean()
+        if not content:
+            return "The shared document is empty."
+        return content
 
     @property
     def all(self) -> list:
-        return [self.create_tasks, self.get_plan_status, self.read_document, self.rewrite_document]
+        return [self.create_tasks, self.get_plan_status, self.read_document, self.consolidate_section, self.read_document_clean]

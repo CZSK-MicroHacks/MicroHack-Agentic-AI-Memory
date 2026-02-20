@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import ReactMarkdown from 'react-markdown';
+import { icons } from './icons';
 
 interface ChatPanelProps {
   onSend: (message: string) => void;
@@ -27,13 +28,15 @@ export default function ChatPanel({ onSend, status, finalAnswer, facilitatorStre
   return (
     <div className="flex flex-col h-full">
       <div className="px-4 py-3 border-b border-gray-200 bg-gray-50">
-        <h2 className="text-sm font-semibold text-gray-600 uppercase tracking-wide">💬 Chat</h2>
+        <h2 className="text-sm font-semibold text-gray-600 uppercase tracking-wide flex items-center gap-1.5">
+          <img src={icons.chatIcon} alt="" className="w-10 h-10" /> Chat
+        </h2>
       </div>
 
       <div className="flex-1 overflow-y-auto panel-scroll p-4 space-y-4">
         {status === 'idle' && (
           <div className="text-center text-gray-400 mt-8">
-            <p className="text-4xl mb-3">🌍</p>
+            <p className="text-4xl mb-3"><img src={icons.globeIcon} alt="Globe" className="w-16 h-16 mx-auto" /></p>
             <p className="text-sm mb-4">Ask me to plan your next trip!</p>
             <div className="space-y-2 max-w-md mx-auto text-left">
               {[
@@ -60,8 +63,10 @@ export default function ChatPanel({ onSend, status, finalAnswer, facilitatorStre
               <span>Agents are working on your travel plan...</span>
             </div>
             {facilitatorStream && (
-              <div className="bg-purple-50 rounded-lg p-3 border border-purple-200">
-                <div className="text-xs font-medium text-purple-600 mb-1">🎯 Facilitator</div>
+              <div className="bg-gray-50 rounded-lg p-3 border border-gray-200">
+                <div className="text-xs font-medium text-gray-600 mb-1 flex items-center gap-1">
+                  <img src={icons.agentFacilitator} alt="" className="w-5 h-5" /> Facilitator
+                </div>
                 <div className="text-sm text-gray-700 markdown-content">
                   <ReactMarkdown>{facilitatorStream}</ReactMarkdown>
                 </div>
@@ -73,7 +78,7 @@ export default function ChatPanel({ onSend, status, finalAnswer, facilitatorStre
         {finalAnswer && (
           <div className="bg-white rounded-lg p-4 border border-gray-200 shadow-sm">
             <div className="text-xs font-medium text-green-600 mb-2 flex items-center gap-1">
-              ✅ Final Travel Plan
+              <img src={icons.checkmarkIcon} alt="" className="w-5 h-5" /> Final Travel Plan
             </div>
             <div className="text-sm text-gray-700 markdown-content">
               <ReactMarkdown>{finalAnswer}</ReactMarkdown>
@@ -82,8 +87,8 @@ export default function ChatPanel({ onSend, status, finalAnswer, facilitatorStre
         )}
 
         {status === 'error' && (
-          <div className="bg-red-50 rounded-lg p-3 border border-red-200 text-sm text-red-700">
-            ⚠️ An error occurred. Check the timeline for details.
+          <div className="bg-red-50 rounded-lg p-3 border border-red-200 text-sm text-red-700 flex items-center gap-1.5">
+            <img src={icons.warningIcon} alt="" className="w-5 h-5" /> An error occurred. Check the timeline for details.
           </div>
         )}
 
@@ -105,7 +110,7 @@ export default function ChatPanel({ onSend, status, finalAnswer, facilitatorStre
             disabled={status === 'running' || !input.trim()}
             className="px-4 py-2 text-sm font-medium text-white bg-purple-600 rounded-lg hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
-            {status === 'running' ? '⏳' : '✈️ Plan'}
+            {status === 'running' ? 'Working…' : 'Plan'}
           </button>
         </div>
       </form>

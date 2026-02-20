@@ -4,14 +4,16 @@ Shared scratchpad memory for multi-agent coordination.
 
 Two scratchpad types:
 - TaskBoard: Task planning and tracking (facilitator creates, agents complete)
-- SharedDocument: Collaborative document with version history
+- SharedDocument: Slot-based collaborative itinerary document
 """
 
 from __future__ import annotations
 
 import copy
+from collections import defaultdict
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
+from typing import Literal
 
 
 @dataclass
@@ -77,91 +79,136 @@ class TaskBoard:
 
 
 @dataclass
-class DocumentVersion:
-    """A snapshot of the shared document at a point in time."""
-    version: int
+class SlotEntry:
+    """A single agent's contribution to a day/time-slot."""
+    agent: str
     content: str
-    author: str
     timestamp: str
-    change_description: str
+
+
+# Valid time-slot identifiers in render order
+TimeSlot = Literal["general", "morning", "afternoon", "evening", "night"]
+SLOT_ORDER: list[TimeSlot] = ["general", "morning", "afternoon", "evening", "night"]
+SLOT_LABELS: dict[TimeSlot, str] = {
+    "general": "General",
+    "morning": "Morning (9:00–12:00)",
+    "afternoon": "Afternoon (12:00–18:00)",
+    "evening": "Evening (18:00–22:00)",
+    "night": "Night (22:00+)",
+}
 
 
 class SharedDocument:
-    """Versioned shared document that agents collaboratively build.
+    """Slot-based shared itinerary that agents collaboratively build.
 
-    Every write creates a new version by appending/integrating a contribution
-    into the current document. Agents run concurrently, so each write reads
-    the latest content at write-time and appends to it.
+    The document is organized as: day (int) → time_slot → list of entries.
+    Day 0 is reserved for general info (airport transfer, accommodation, etc.).
+    Agents write entries into specific slots concurrently.
+    The facilitator can consolidate slots (replace all entries with a merged version)
+    or rewrite a full day.
+
+    A version counter tracks every mutation for the UI.
     """
 
     def __init__(self) -> None:
-        self._versions: list[DocumentVersion] = []
+        # day -> time_slot -> list[SlotEntry]
+        self._sections: dict[int, dict[TimeSlot, list[SlotEntry]]] = defaultdict(
+            lambda: defaultdict(list)
+        )
+        self._version: int = 0
+        self._history: list[dict] = []  # version metadata for UI
+
+    # ── Specialist writes ────────────────────────────────────────────
+
+    def write_section(
+        self, day: int, time_slot: TimeSlot, content: str, agent: str,
+    ) -> int:
+        """Append an entry to a specific day/time-slot. Returns new version number."""
+        entry = SlotEntry(
+            agent=agent,
+            content=content,
+            timestamp=datetime.now(timezone.utc).isoformat(),
+        )
+        self._sections[day][time_slot].append(entry)
+        self._version += 1
+        self._history.append({
+            "version": self._version,
+            "author": agent,
+            "timestamp": entry.timestamp,
+            "change_description": f"{agent} added to Day {day} / {time_slot}",
+        })
+        return self._version
+
+    # ── Facilitator merges ───────────────────────────────────────────
+
+    def consolidate_section(
+        self, day: int, time_slot: TimeSlot, content: str, author: str = "facilitator",
+    ) -> int:
+        """Replace ALL entries in a day/time-slot with a single merged entry."""
+        self._sections[day][time_slot] = [
+            SlotEntry(
+                agent=author,
+                content=content,
+                timestamp=datetime.now(timezone.utc).isoformat(),
+            )
+        ]
+        self._version += 1
+        self._history.append({
+            "version": self._version,
+            "author": author,
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "change_description": f"{author} consolidated Day {day} / {time_slot}",
+        })
+        return self._version
+
+    # ── Reads ────────────────────────────────────────────────────────
+
+    def render(self, show_agent_tags: bool = True) -> str:
+        """Render the full document as markdown.
+
+        If show_agent_tags=True, each entry is prefixed with [agent] so the
+        facilitator can see who contributed what.
+        """
+        if not self._sections:
+            return ""
+
+        lines: list[str] = []
+        for day_num in sorted(self._sections.keys()):
+            slots = self._sections[day_num]
+            if day_num == 0:
+                lines.append("## General Info")
+            else:
+                lines.append(f"## Day {day_num}")
+            lines.append("")
+
+            for slot in SLOT_ORDER:
+                entries = slots.get(slot, [])
+                if not entries:
+                    continue
+                if slot != "general":
+                    lines.append(f"### {SLOT_LABELS[slot]}")
+                for entry in entries:
+                    if show_agent_tags:
+                        lines.append(f"**[{entry.agent}]**")
+                    lines.append(entry.content)
+                    lines.append("")
+
+        return "\n".join(lines).strip()
 
     def read_latest(self) -> str:
-        """Return the latest document content, or empty string if none."""
-        if not self._versions:
-            return ""
-        return self._versions[-1].content
+        """Return the rendered document (with agent tags)."""
+        return self.render(show_agent_tags=True)
 
-    def write(self, content: str, author: str, change_description: str = "") -> DocumentVersion:
-        """Save a new version of the document by replacing it entirely."""
-        if not change_description:
-            change_description = f"{author} updated the document"
+    def render_clean(self) -> str:
+        """Return the rendered document without agent tags (for final output)."""
+        return self.render(show_agent_tags=False)
 
-        version = DocumentVersion(
-            version=len(self._versions) + 1,
-            content=content,
-            author=author,
-            timestamp=datetime.now(timezone.utc).isoformat(),
-            change_description=change_description,
-        )
-        self._versions.append(version)
-        return version
-
-    def append(self, contribution: str, author: str, change_description: str = "") -> DocumentVersion:
-        """Append a contribution to the current document, creating a new version.
-
-        This is safe for concurrent use — it reads the latest content at call
-        time and appends the new contribution.
-        """
-        current = self.read_latest()
-        if current:
-            new_content = f"{current}\n\n{contribution}"
-        else:
-            new_content = contribution
-
-        if not change_description:
-            change_description = f"{author} added content to the document"
-
-        version = DocumentVersion(
-            version=len(self._versions) + 1,
-            content=new_content,
-            author=author,
-            timestamp=datetime.now(timezone.utc).isoformat(),
-            change_description=change_description,
-        )
-        self._versions.append(version)
-        return version
-
-    def get_version(self, version_number: int) -> DocumentVersion | None:
-        """Get a specific historical version (1-based)."""
-        idx = version_number - 1
-        if 0 <= idx < len(self._versions):
-            return self._versions[idx]
-        return None
+    def get_version(self) -> int:
+        return self._version
 
     def list_versions(self) -> list[dict]:
-        """Return metadata for all versions."""
-        return [
-            {
-                "version": v.version,
-                "author": v.author,
-                "timestamp": v.timestamp,
-                "change_description": v.change_description,
-            }
-            for v in self._versions
-        ]
+        return list(self._history)
 
-    def get_latest_version_number(self) -> int:
-        """Return the current version number (0 if empty)."""
-        return len(self._versions)
+    def get_slot_entries(self, day: int, time_slot: TimeSlot) -> list[SlotEntry]:
+        """Get raw entries for a specific slot."""
+        return list(self._sections.get(day, {}).get(time_slot, []))

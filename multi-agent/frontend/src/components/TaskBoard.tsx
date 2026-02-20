@@ -1,4 +1,5 @@
 import { AGENT_COLORS, AGENT_LABELS, type TaskItem } from '../types';
+import { icons, AGENT_ICONS } from './icons';
 
 interface TaskBoardProps {
   tasks: TaskItem[];
@@ -11,7 +12,9 @@ export default function TaskBoard({ tasks }: TaskBoardProps) {
   return (
     <div className="flex flex-col h-full">
       <div className="px-4 py-3 border-b border-gray-200 bg-gray-50 flex items-center justify-between">
-        <h2 className="text-sm font-semibold text-gray-600 uppercase tracking-wide">📋 Task Board</h2>
+        <h2 className="text-sm font-semibold text-gray-600 uppercase tracking-wide flex items-center gap-1.5">
+          <img src={icons.taskboardIcon} alt="" className="w-10 h-10" /> Task Board
+        </h2>
         {total > 0 && (
           <span className="text-xs font-medium text-gray-500">
             {doneCount}/{total} done
@@ -40,6 +43,7 @@ export default function TaskBoard({ tasks }: TaskBoardProps) {
             {tasks.map(task => {
               const colors = AGENT_COLORS[task.assigned_to] || AGENT_COLORS.facilitator;
               const label = AGENT_LABELS[task.assigned_to] || task.assigned_to;
+              const agentIcon = AGENT_ICONS[task.assigned_to];
               return (
                 <div
                   key={task.id}
@@ -51,12 +55,13 @@ export default function TaskBoard({ tasks }: TaskBoardProps) {
                 >
                   <div className="flex items-start gap-2">
                     <span className="text-base mt-0.5 flex-shrink-0">
-                      {task.finished ? '✅' : '⏳'}
+                      <img src={task.finished ? icons.checkmarkIcon : icons.hourglassIcon} alt="" className="w-6 h-6" />
                     </span>
                     <div className="flex-1 min-w-0">
                       <div className="text-xs text-gray-700 leading-snug">{task.text}</div>
                       <div className="mt-1 flex items-center gap-1.5">
-                        <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded ${colors.bg} ${colors.text}`}>
+                        <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded ${colors.bg} ${colors.text} inline-flex items-center gap-1`}>
+                          {agentIcon && <img src={agentIcon} alt="" className="w-4 h-4" />}
                           {label}
                         </span>
                         <span className="text-[10px] text-gray-400">#{task.id}</span>
