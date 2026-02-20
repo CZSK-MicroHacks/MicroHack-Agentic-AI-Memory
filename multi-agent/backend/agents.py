@@ -70,8 +70,8 @@ async def run_agent(
         "message": message,
     })
 
-    # Create specialist tools bound to this agent
-    tools = SpecialistTools(task_board, document, emitter, agent_name)
+    # Create specialist tools bound to this agent and its assigned tasks
+    tools = SpecialistTools(task_board, document, emitter, agent_name, assigned_task_ids=task_ids)
 
     # Create the agent
     agent = Agent(
@@ -123,6 +123,17 @@ async def run_agent(
         "display_name": display_name,
         "content": response_text,
     })
+
+    # Auto-complete any assigned tasks the agent forgot to mark done
+    for tid in task_ids:
+        tasks_check = task_board.read_tasks([tid])
+        if tasks_check and not tasks_check[0].finished:
+            logger.warning("%s did not complete task %d — auto-completing", display_name, tid)
+            task_board.complete_task(tid)
+            await emitter.emit("task_updated", {
+                "id": tid, "text": tasks_check[0].text,
+                "assigned_to": tasks_check[0].assigned_to, "finished": True,
+            })
 
     await emitter.emit("agent_finished", {
         "agent": agent_name,

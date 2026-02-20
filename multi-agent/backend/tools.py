@@ -25,11 +25,12 @@ logger = logging.getLogger("travel.tools")
 class SpecialistTools:
     """Tools available to specialist agents (logistics, sightseeing, experience, food)."""
 
-    def __init__(self, task_board: TaskBoard, document: SharedDocument, emitter: EventEmitter, agent_name: str) -> None:
+    def __init__(self, task_board: TaskBoard, document: SharedDocument, emitter: EventEmitter, agent_name: str, assigned_task_ids: list[int] | None = None) -> None:
         self._task_board = task_board
         self._document = document
         self._emitter = emitter
         self._agent_name = agent_name
+        self._assigned_task_ids = assigned_task_ids or []
 
     @tool
     async def read_tasks(
@@ -52,15 +53,29 @@ class SpecialistTools:
         task_id: Annotated[int, Field(description="ID of the task to mark as completed")],
     ) -> str:
         """Mark a task as completed on the shared task board."""
-        task = self._task_board.complete_task(task_id)
+        # Auto-correct if the agent passes a wrong task ID — map to the next
+        # uncompleted assigned task instead.
+        actual_id = task_id
+        if self._assigned_task_ids and task_id not in self._assigned_task_ids:
+            pending = [
+                tid for tid in self._assigned_task_ids
+                if not any(t.finished for t in self._task_board.read_tasks([tid]))
+            ]
+            if pending:
+                actual_id = pending[0]
+                logger.warning(
+                    "%s tried to complete task %d but is assigned %s — auto-correcting to task %d",
+                    self._agent_name, task_id, self._assigned_task_ids, actual_id,
+                )
+        task = self._task_board.complete_task(actual_id)
         if task is None:
-            return f"Task {task_id} not found."
+            return f"Task {actual_id} not found."
         await self._emitter.emit("task_updated", {
             "id": task.id, "text": task.text,
             "assigned_to": task.assigned_to, "finished": True,
         })
-        logger.info("Task %d completed by %s", task_id, self._agent_name)
-        return f"Task {task_id} marked as completed."
+        logger.info("Task %d completed by %s", actual_id, self._agent_name)
+        return f"Task {actual_id} marked as completed."
 
     @tool
     async def read_document(self) -> str:
@@ -117,7 +132,14 @@ class FacilitatorTools:
             if isinstance(tasks_json, list):
                 tasks = tasks_json
             elif isinstance(tasks_json, str):
-                tasks = json.loads(tasks_json)
+                # LLM sometimes appends extra text after the JSON array —
+                # find the outermost [...] and parse only that.
+                raw = tasks_json.strip()
+                start = raw.find("[")
+                end = raw.rfind("]")
+                if start != -1 and end != -1 and end > start:
+                    raw = raw[start:end + 1]
+                tasks = json.loads(raw)
             else:
                 tasks = json.loads(str(tasks_json))
             created = self._task_board.create_tasks(tasks)
