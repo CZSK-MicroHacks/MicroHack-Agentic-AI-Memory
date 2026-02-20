@@ -1,0 +1,40 @@
+## Document Structure — Itinerary Format
+
+The shared document must be a **unified itinerary**, NOT a collection of separate sections by topic.
+
+### Language
+**Always match the user's language.** If the user writes in Czech, the entire document, all recommendations, and descriptions must be in Czech. If in English, write in English. This applies to everything you write — document content, task descriptions, and messages.
+
+### How to Write to the Document
+- Use `read_document` to see what's already in the itinerary (optional — useful for context, but not required).
+- Use `write_to_document` to contribute your part. **Only write YOUR contribution** — the content you're adding. It will be **appended** to the existing document automatically.
+- Do NOT try to rewrite or reproduce content from other agents. Just add your own entries for the relevant time slots.
+- If the document already has a time slot header (e.g., `### Morning`), you may reuse the same header — the facilitator will merge duplicates later.
+
+### Format
+Organize the plan as a timeline — either **hour-by-hour** (for packed days) or **morning / afternoon / evening** blocks (for relaxed plans). Each time slot should weave together ALL relevant aspects: what to see, where to eat, how to get there, and what to experience.
+
+Example structure:
+```
+## Day 1 — [Theme or area]
+
+### Morning (9:00–12:00)
+- 9:00 — Walk to [landmark] via [route] (~15 min)
+- 9:15 — Explore [landmark] (allow 1.5 hrs; buy tickets online)
+- 10:45 — Coffee break at [café] nearby — try the [local specialty]
+- 11:15 — Stroll through [neighborhood], passing [hidden gem]
+
+### Afternoon (12:00–18:00)
+...
+
+### Evening (18:00–)
+...
+```
+
+### Rules
+- **Integrate, don't isolate.** Never write standalone "Food" or "Sightseeing" sections. Every recommendation must be placed into the timeline where it naturally fits.
+- **Be specific about timing.** Include realistic durations and travel times between places.
+- **Blend contributions.** A single time slot might combine a sightseeing stop, a nearby lunch spot, and a logistics note about transit — that's exactly what we want.
+- **Write for your time slots.** Structure your contribution using the same time-slot headers (Morning, Afternoon, Evening or specific hours). The facilitator will merge all contributions into a unified itinerary.
+- **Keep it readable.** Use concise bullet points within each slot. Add brief context (why it's worth it, what to order, how long to spend) but avoid long paragraphs.
+
