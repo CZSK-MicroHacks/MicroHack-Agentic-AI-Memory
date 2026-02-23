@@ -2,7 +2,21 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Custom scrollbar for panels */
+@layer base {
+  *, *::before, *::after {
+    box-sizing: border-box;
+  }
+
+  html, body {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    margin: 0;
+    padding: 0;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+}
+
+/* Custom scrollbar matching existing frontend */
 .panel-scroll::-webkit-scrollbar {
   width: 6px;
 }
@@ -10,8 +24,13 @@
   background: transparent;
 }
 .panel-scroll::-webkit-scrollbar-thumb {
-  background: #cbd5e1;
+  background: #c5c5d2;
   border-radius: 3px;
+}
+@media (prefers-color-scheme: dark) {
+  .panel-scroll::-webkit-scrollbar-thumb {
+    background: #444654;
+  }
 }
 
 /* Pulse animation for active agents */
@@ -23,12 +42,21 @@
   animation: pulse-dot 1.5s ease-in-out infinite;
 }
 
-/* Markdown content styling */
+/* Fade-in animation matching existing frontend */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.animate-fade-in {
+  animation: fadeIn 0.25s ease-out;
+}
+
+/* Markdown content styling — uses the design-system palette */
 .markdown-content h2 {
-  @apply text-lg font-semibold mt-4 mb-2 text-gray-800;
+  @apply text-lg font-semibold mt-4 mb-2 text-n-10 dark:text-n-90;
 }
 .markdown-content h3 {
-  @apply text-base font-medium mt-3 mb-1 text-gray-700;
+  @apply text-base font-medium mt-3 mb-1 text-n-20 dark:text-n-80;
 }
 .markdown-content ul {
   @apply list-disc pl-5 mb-2 space-y-1;
@@ -37,11 +65,26 @@
   @apply list-decimal pl-5 mb-2 space-y-1;
 }
 .markdown-content p {
-  @apply mb-2;
+  @apply mb-2 leading-relaxed;
 }
 .markdown-content li {
   @apply text-sm;
 }
 .markdown-content strong {
   @apply font-semibold;
+}
+.markdown-content code {
+  @apply font-mono text-[0.85em] px-1.5 py-0.5 rounded bg-n-95 dark:bg-n-20;
+}
+.markdown-content pre {
+  @apply my-3 p-3.5 rounded-lg overflow-x-auto bg-n-10 text-n-95 dark:bg-n-5 dark:text-n-90;
+}
+.markdown-content pre code {
+  @apply p-0 bg-transparent;
+}
+.markdown-content blockquote {
+  @apply my-2 py-1 pl-3.5 border-l-[3px] border-n-80 text-n-40 dark:border-n-35 dark:text-n-60;
+}
+.markdown-content a {
+  @apply text-p-40 underline underline-offset-2 dark:text-p-70;
 }

@@ -35,13 +35,13 @@ export interface WorkflowState {
   facilitatorStream: string;
 }
 
-// Agent color mapping — monochromatic neutral palette; icons provide the color
+// Agent color mapping — uses the neutral palette from the design system; dots keep distinct hues
 export const AGENT_COLORS: Record<string, { bg: string; text: string; border: string; dot: string }> = {
-  facilitator: { bg: 'bg-gray-100', text: 'text-gray-700', border: 'border-gray-300', dot: 'bg-purple-500' },
-  logistics:   { bg: 'bg-gray-100', text: 'text-gray-700', border: 'border-gray-300', dot: 'bg-blue-500' },
-  sightseeing: { bg: 'bg-gray-100', text: 'text-gray-700', border: 'border-gray-300', dot: 'bg-green-500' },
-  experience:  { bg: 'bg-gray-100', text: 'text-gray-700', border: 'border-gray-300', dot: 'bg-amber-500' },
-  food:        { bg: 'bg-gray-100', text: 'text-gray-700', border: 'border-gray-300', dot: 'bg-red-500' },
+  facilitator: { bg: 'bg-n-95 dark:bg-n-20', text: 'text-n-30 dark:text-n-80', border: 'border-n-90 dark:border-n-25', dot: 'bg-p-50' },
+  logistics:   { bg: 'bg-n-95 dark:bg-n-20', text: 'text-n-30 dark:text-n-80', border: 'border-n-90 dark:border-n-25', dot: 'bg-blue-500' },
+  sightseeing: { bg: 'bg-n-95 dark:bg-n-20', text: 'text-n-30 dark:text-n-80', border: 'border-n-90 dark:border-n-25', dot: 'bg-green-500' },
+  experience:  { bg: 'bg-n-95 dark:bg-n-20', text: 'text-n-30 dark:text-n-80', border: 'border-n-90 dark:border-n-25', dot: 'bg-amber-500' },
+  food:        { bg: 'bg-n-95 dark:bg-n-20', text: 'text-n-30 dark:text-n-80', border: 'border-n-90 dark:border-n-25', dot: 'bg-red-500' },
 };
 
 export const AGENT_LABELS: Record<string, string> = {

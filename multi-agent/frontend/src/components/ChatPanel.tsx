@@ -27,17 +27,12 @@ export default function ChatPanel({ onSend, status, finalAnswer, facilitatorStre
 
   return (
     <div className="flex flex-col h-full">
-      <div className="px-4 py-3 border-b border-gray-200 bg-gray-50">
-        <h2 className="text-sm font-semibold text-gray-600 uppercase tracking-wide flex items-center gap-1.5">
-          <img src={icons.chatIcon} alt="" className="w-10 h-10" /> Chat
-        </h2>
-      </div>
-
-      <div className="flex-1 overflow-y-auto panel-scroll p-4 space-y-4">
+      <div className="flex-1 overflow-y-auto panel-scroll">
+        <div className="max-w-3xl mx-auto px-6 py-4 space-y-4">
         {status === 'idle' && (
-          <div className="text-center text-gray-400 mt-8">
+          <div className="text-center text-n-60 dark:text-n-50 mt-8 animate-fade-in">
             <p className="text-4xl mb-3"><img src={icons.globeIcon} alt="Globe" className="w-16 h-16 mx-auto" /></p>
-            <p className="text-sm mb-4">Ask me to plan your next trip!</p>
+            <p className="text-sm mb-4 text-n-50 dark:text-n-60">Ask me to plan your next trip!</p>
             <div className="space-y-2 max-w-md mx-auto text-left">
               {[
                 'Naplánuj výlet do Prahy na 2 dny. Chci ochutnat něco typicky českého, zajít na koncert a něco vidět.',
@@ -47,7 +42,7 @@ export default function ChatPanel({ onSend, status, finalAnswer, facilitatorStre
                 <button
                   key={i}
                   onClick={() => { onSend(prompt); }}
-                  className="w-full text-left px-3 py-2 text-xs text-gray-600 bg-gray-50 rounded-lg border border-gray-200 hover:bg-purple-50 hover:border-purple-300 hover:text-purple-700 transition-colors cursor-pointer"
+                  className="w-full text-left px-3 py-2.5 text-[13px] text-n-30 dark:text-n-80 bg-n-100 dark:bg-n-20 rounded-xl border border-n-90 dark:border-n-25 hover:bg-n-98 dark:hover:bg-n-25 hover:border-n-80 dark:hover:border-n-35 transition-colors cursor-pointer"
                 >
                   {prompt}
                 </button>
@@ -57,17 +52,17 @@ export default function ChatPanel({ onSend, status, finalAnswer, facilitatorStre
         )}
 
         {status === 'running' && !finalAnswer && (
-          <div className="space-y-3">
-            <div className="flex items-center gap-2 text-sm text-purple-600">
+          <div className="space-y-3 animate-fade-in">
+            <div className="flex items-center gap-2 text-sm text-p-50 dark:text-p-60">
               <span className="animate-pulse-dot">●</span>
               <span>Agents are working on your travel plan...</span>
             </div>
             {facilitatorStream && (
-              <div className="bg-gray-50 rounded-lg p-3 border border-gray-200">
-                <div className="text-xs font-medium text-gray-600 mb-1 flex items-center gap-1">
+              <div className="bg-n-98 dark:bg-n-20 rounded-xl p-3 border border-n-90 dark:border-n-25">
+                <div className="text-xs font-medium text-n-50 dark:text-n-60 mb-1 flex items-center gap-1">
                   <img src={icons.agentFacilitator} alt="" className="w-5 h-5" /> Facilitator
                 </div>
-                <div className="text-sm text-gray-700 markdown-content">
+                <div className="text-sm text-n-10 dark:text-n-90 markdown-content">
                   <ReactMarkdown>{facilitatorStream}</ReactMarkdown>
                 </div>
               </div>
@@ -76,44 +71,47 @@ export default function ChatPanel({ onSend, status, finalAnswer, facilitatorStre
         )}
 
         {finalAnswer && (
-          <div className="bg-white rounded-lg p-4 border border-gray-200 shadow-sm">
-            <div className="text-xs font-medium text-green-600 mb-2 flex items-center gap-1">
+          <div className="bg-n-100 dark:bg-n-20 rounded-xl p-4 border border-n-90 dark:border-n-25 animate-fade-in">
+            <div className="text-xs font-medium text-green-600 dark:text-green-400 mb-2 flex items-center gap-1">
               <img src={icons.checkmarkIcon} alt="" className="w-5 h-5" /> Final Travel Plan
             </div>
-            <div className="text-sm text-gray-700 markdown-content">
+            <div className="text-sm text-n-10 dark:text-n-90 markdown-content">
               <ReactMarkdown>{finalAnswer}</ReactMarkdown>
             </div>
           </div>
         )}
 
         {status === 'error' && (
-          <div className="bg-red-50 rounded-lg p-3 border border-red-200 text-sm text-red-700 flex items-center gap-1.5">
+          <div className="bg-red-50 dark:bg-red-950 rounded-xl p-3 border border-red-200 dark:border-red-800 text-sm text-red-700 dark:text-red-300 flex items-center gap-1.5">
             <img src={icons.warningIcon} alt="" className="w-5 h-5" /> An error occurred. Check the timeline for details.
           </div>
         )}
 
         <div ref={bottomRef} />
+        </div>
       </div>
 
-      <form onSubmit={handleSubmit} className="p-3 border-t border-gray-200 bg-white">
-        <div className="flex gap-2">
+      <div className="border-t border-n-95 dark:border-n-25 bg-n-100 dark:bg-n-15">
+        <form onSubmit={handleSubmit} className="max-w-3xl mx-auto px-6 py-3">
+        <div className="flex gap-0 border border-n-90 dark:border-n-25 rounded-2xl bg-n-100 dark:bg-n-20 overflow-hidden focus-within:border-n-70 dark:focus-within:border-n-40 focus-within:shadow-[0_0_0_1px] focus-within:shadow-n-70 dark:focus-within:shadow-n-40 transition-all">
           <input
             type="text"
             value={input}
             onChange={e => setInput(e.target.value)}
             placeholder="Where would you like to travel?"
             disabled={status === 'running'}
-            className="flex-1 px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-400 focus:border-transparent disabled:opacity-50 disabled:bg-gray-50"
+            className="flex-1 px-4 py-3.5 text-sm bg-transparent border-none outline-none text-n-10 dark:text-n-90 placeholder-n-60 dark:placeholder-n-50 disabled:opacity-50 disabled:bg-transparent font-sans"
           />
           <button
             type="submit"
             disabled={status === 'running' || !input.trim()}
-            className="px-4 py-2 text-sm font-medium text-white bg-purple-600 rounded-lg hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            className="flex items-center justify-center w-10 h-10 m-1 rounded-[10px] border-none bg-n-10 dark:bg-n-90 text-n-100 dark:text-n-10 cursor-pointer transition-opacity disabled:opacity-30 disabled:cursor-default hover:not-disabled:opacity-85"
           >
-            {status === 'running' ? 'Working…' : 'Plan'}
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="22" y1="2" x2="11" y2="13" /><polygon points="22 2 15 22 11 13 2 9 22 2" /></svg>
           </button>
         </div>
-      </form>
+        </form>
+      </div>
     </div>
   );
 }
