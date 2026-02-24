@@ -1,0 +1,18 @@
+[project]
+name = "knowledge-graph"
+version = "0.1.0"
+description = "Challenge 07: Knowledge Graph — Biomedical Drug Interactions with GraphRAG-style search"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "asyncpg>=0.30.0",
+    "azure-identity>=1.20.0",
+    "openai>=1.40.0",
+    "python-dotenv>=1.2.1",
+    "pydantic>=2.0.0",
+    "pytest>=8.0.0",
+    "pytest-asyncio>=0.25.0",
+]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"

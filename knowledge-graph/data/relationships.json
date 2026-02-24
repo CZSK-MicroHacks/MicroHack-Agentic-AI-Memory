@@ -1,0 +1,1412 @@
+[
+  {
+    "source": "Warfarin",
+    "target": "Deep Vein Thrombosis",
+    "relationship_type": "treats",
+    "properties": {
+      "strength": "strong",
+      "evidence": "well-established",
+      "description": "Warfarin is an anticoagulant used to treat and prevent blood clots in conditions like DVT."
+    }
+  },
+  {
+    "source": "Warfarin",
+    "target": "Bleeding",
+    "relationship_type": "causes_side_effect",
+    "properties": {
+      "strength": "strong",
+      "evidence": "well-established",
+      "description": "Warfarin can cause excessive bleeding due to its anticoagulant effects."
+    }
+  },
+  {
+    "source": "Warfarin",
+    "target": "VKORC1",
+    "relationship_type": "targets_gene",
+    "properties": {
+      "strength": "strong",
+      "evidence": "well-established",
+      "description": "Warfarin targets the VKORC1 gene involved in vitamin K metabolism."
+    }
+  },
+  {
+    "source": "Metformin",
+    "target": "Type 2 Diabetes",
+    "relationship_type": "treats",
+    "properties": {
+      "strength": "strong",
+      "evidence": "well-established",
+      "description": "Metformin is the first-line treatment for Type 2 Diabetes."
+    }
+  },
+  {
+    "source": "Metformin",
+    "target": "AMPK",
+    "relationship_type": "targets_gene",
+    "properties": {
+      "strength": "strong",
+      "evidence": "well-established",
+      "description": "Metformin activates AMPK, which plays a crucial role in glucose regulation."
+    }
+  },
+  {
+    "source": "Lisinopril",
+    "target": "Hypertension",
+    "relationship_type": "treats",
+    "properties": {
+      "strength": "strong",
+      "evidence": "well-established",
+      "description": "Lisinopril is an ACE inhibitor used to treat high blood pressure."
+    }
+  },
+  {
+    "source": "Lisinopril",
+    "target": "ACE",
+    "relationship_type": "targets_gene",
+    "properties": {
+      "strength": "strong",
+      "evidence": "well-established",
+      "description": "Lisinopril inhibits the ACE gene, reducing blood pressure."
+    }
+  },
+  {
+    "source": "Sertraline",
+    "target": "Major Depression",
+    "relationship_type": "treats",
+    "properties": {
+      "strength": "strong",
+      "evidence": "well-established",
+      "description": "Sertraline is an SSRI used to treat Major Depression."
+    }
+  },
+  {
+    "source": "Sertraline",
+    "target": "Dizziness",
+    "relationship_type": "causes_side_effect",
+    "properties": {
+      "strength": "moderate",
+      "evidence": "well-established",
+      "description": "Dizziness is a common side effect of Sertraline."
+    }
+  },
+  {
+    "source": "Ibuprofen",
+    "target": "Joint Pain",
+    "relationship_type": "treats",
+    "properties": {
+      "strength": "strong",
+      "evidence": "well-established",
+      "description": "Ibuprofen is a nonsteroidal anti-inflammatory drug (NSAID) used to relieve joint pain."
+    }
+  },
+  {
+    "source": "Ibuprofen",
+    "target": "COX-2",
+    "relationship_type": "targets_gene",
+    "properties": {
+      "strength": "strong",
+      "evidence": "well-established",
+      "description": "Ibuprofen inhibits COX-2, reducing inflammation and pain."
+    }
+  },
+  {
+    "source": "Aspirin",
+    "target": "Bleeding",
+    "relationship_type": "causes_side_effect",
+    "properties": {
+      "strength": "strong",
+      "evidence": "well-established",
+      "description": "Aspirin can lead to bleeding due to its blood-thinning properties."
+    }
+  },
+  {
+    "source": "Aspirin",
+    "target": "Heart Failure",
+    "relationship_type": "treats",
+    "properties": {
+      "strength": "moderate",
+      "evidence": "emerging",
+      "description": "Aspirin may help prevent complications in heart failure patients."
+    }
+  },
+  {
+    "source": "Clopidogrel",
+    "target": "Atrial Fibrillation",
+    "relationship_type": "treats",
+    "properties": {
+      "strength": "strong",
+      "evidence": "well-established",
+      "description": "Clopidogrel is used to reduce the risk of stroke in patients with Atrial Fibrillation."
+    }
+  },
+  {
+    "source": "Clopidogrel",
+    "target": "Bleeding",
+    "relationship_type": "causes_side_effect",
+    "properties": {
+      "strength": "strong",
+      "evidence": "well-established",
+      "description": "Clopidogrel can cause bleeding due to its antiplatelet effects."
+    }
+  },
+  {
+    "source": "Methotrexate",
+    "target": "Rheumatoid Arthritis",
+    "relationship_type": "treats",
+    "properties": {
+      "strength": "strong",
+      "evidence": "well-established",
+      "description": "Methotrexate is a cornerstone treatment for Rheumatoid Arthritis."
+    }
+  },
+  {
+    "source": "Methotrexate",
+    "target": "TNF-alpha",
+    "relationship_type": "targets_gene",
+    "properties": {
+      "strength": "moderate",
+      "evidence": "emerging",
+      "description": "Methotrexate may affect TNF-alpha levels, which are involved in inflammation."
+    }
+  },
+  {
+    "source": "Insulin",
+    "target": "Type 2 Diabetes",
+    "relationship_type": "treats",
+    "properties": {
+      "strength": "strong",
+      "evidence": "well-established",
+      "description": "Insulin therapy is essential for managing blood sugar levels in Type 2 Diabetes."
+    }
+  },
+  {
+    "source": "Insulin",
+    "target": "Insulin Signaling Pathway",
+    "relationship_type": "involves_pathway",
+    "properties": {
+      "strength": "strong",
+      "evidence": "well-established",
+      "description": "Insulin directly activates the Insulin Signaling Pathway."
+    }
+  },
+  {
+    "source": "Atorvastatin",
+    "target": "Cholesterol Metabolism Pathway",
+    "relationship_type": "involves_pathway",
+    "properties": {
+      "strength": "strong",
+      "evidence": "well-established",
+      "description": "Atorvastatin inhibits cholesterol synthesis through the Cholesterol Metabolism Pathway."
+    }
+  },
+  {
+    "source": "Omeprazole",
+    "target": "GERD",
+    "relationship_type": "treats",
+    "properties": {
+      "strength": "strong",
+      "evidence": "well-established",
+      "description": "Omeprazole is a proton pump inhibitor used to treat GERD."
+    }
+  },
+  {
+    "source": "Omeprazole",
+    "target": "Stomach Pain",
+    "relationship_type": "presents_as",
+    "properties": {
+      "strength": "strong",
+      "evidence": "well-established",
+      "description": "GERD often presents as stomach pain, which Omeprazole treats."
+    }
+  },
+  {
+    "source": "Prednisone",
+    "target": "Inflammatory Response Pathway",
+    "relationship_type": "involves_pathway",
+    "properties": {
+      "strength": "strong",
+      "evidence": "well-established",
+      "description": "Prednisone modulates the Inflammatory Response Pathway."
+    }
+  },
+  {
+    "source": "Gabapentin",
+    "target": "Chronic Pain Syndrome",
+    "relationship_type": "treats",
+    "properties": {
+      "strength": "strong",
+      "evidence": "well-established",
+      "description": "Gabapentin is used to manage neuropathic pain in chronic pain syndrome."
+    }
+  },
+  {
+    "source": "Gabapentin",
+    "target": "Fatigue",
+    "relationship_type": "presents_as",
+    "properties": {
+      "strength": "moderate",
+      "evidence": "emerging",
+      "description": "Fatigue can be a symptom of chronic pain syndromes managed by Gabapentin."
+    }
+  },
+  {
+    "source": "Levothyroxine",
+    "target": "Hypothyroidism",
+    "relationship_type": "treats",
+    "properties": {
+      "strength": "strong",
+      "evidence": "well-established",
+      "description": "Levothyroxine is the standard treatment for hypothyroidism."
+    }
+  },
+  {
+    "source": "Levothyroxine",
+    "target": "Thyroid Hormone Pathway",
+    "relationship_type": "involves_pathway",
+    "properties": {
+      "strength": "strong",
+      "evidence": "well-established",
+      "description": "Levothyroxine acts in the Thyroid Hormone Pathway to regulate metabolism."
+    }
+  },
+  {
+    "source": "Aspirin",
+    "target": "Ibuprofen",
+    "relationship_type": "interacts_with",
+    "properties": {
+      "strength": "strong",
+      "evidence": "well-established",
+      "description": "Aspirin and Ibuprofen can both increase the risk of gastrointestinal bleeding."
+    }
+  },
+  {
+    "source": "Warfarin",
+    "target": "Aspirin",
+    "relationship_type": "interacts_with",
+    "properties": {
+      "strength": "strong",
+      "evidence": "well-established",
+      "description": "Warfarin and Aspirin can increase the risk of bleeding when used together."
+    }
+  },
+  {
+    "source": "Clopidogrel",
+    "target": "Aspirin",
+    "relationship_type": "interacts_with",
+    "properties": {
+      "strength": "strong",
+      "evidence": "well-established",
+      "description": "Clopidogrel and Aspirin can be used together for cardiovascular protection but increase bleeding risk."
+    }
+  },
+  {
+    "source": "Lisinopril",
+    "target": "Ibuprofen",
+    "relationship_type": "interacts_with",
+    "properties": {
+      "strength": "moderate",
+      "evidence": "well-established",
+      "description": "Ibuprofen may reduce the antihypertensive effects of Lisinopril."
+    }
+  },
+  {
+    "source": "Metformin",
+    "target": "Gabapentin",
+    "relationship_type": "interacts_with",
+    "properties": {
+      "strength": "weak",
+      "evidence": "emerging",
+      "description": "Increased risk of peripheral neuropathy when used with Metformin."
+    }
+  },
+  {
+    "source": "Warfarin",
+    "target": "Prednisone",
+    "relationship_type": "contraindicated",
+    "properties": {
+      "strength": "strong",
+      "evidence": "well-established",
+      "description": "Prednisone may increase the anticoagulant effect of Warfarin, leading to a higher risk of bleeding."
+    }
+  },
+  {
+    "source": "Atorvastatin",
+    "target": "Heart Failure",
+    "relationship_type": "treats",
+    "properties": {
+      "strength": "moderate",
+      "evidence": "emerging",
+      "description": "Atorvastatin may help in reducing the risk of heart failure."
+    }
+  },
+  {
+    "source": "Atorvastatin",
+    "target": "PCSK9",
+    "relationship_type": "targets_gene",
+    "properties": {
+      "strength": "strong",
+      "evidence": "well-established",
+      "description": "Atorvastatin targets the PCSK9 gene to lower cholesterol levels."
+    }
+  },
+  {
+    "source": "Gabapentin",
+    "target": "Muscle Weakness",
+    "relationship_type": "presents_as",
+    "properties": {
+      "strength": "moderate",
+      "evidence": "emerging",
+      "description": "Muscle weakness can occur as a side effect of Gabapentin."
+    }
+  },
+  {
+    "source": "Chronic Pain Syndrome",
+    "target": "Fatigue",
+    "relationship_type": "presents_as",
+    "properties": {
+      "strength": "strong",
+      "evidence": "well-established",
+      "description": "Chronic Pain Syndrome often presents as fatigue."
+    }
+  },
+  {
+    "source": "Type 2 Diabetes",
+    "target": "Fatigue",
+    "relationship_type": "presents_as",
+    "properties": {
+      "strength": "strong",
+      "evidence": "well-established",
+      "description": "Fatigue is a common symptom of Type 2 Diabetes."
+    }
+  },
+  {
+    "source": "Hypertension",
+    "target": "Headache",
+    "relationship_type": "presents_as",
+    "properties": {
+      "strength": "strong",
+      "evidence": "well-established",
+      "description": "Hypertension can often present as a headache."
+    }
+  },
+  {
+    "source": "Rheumatoid Arthritis",
+    "target": "Joint Pain",
+    "relationship_type": "presents_as",
+    "properties": {
+      "strength": "strong",
+      "evidence": "well-established",
+      "description": "Joint pain is a common symptom of Rheumatoid Arthritis."
+    }
+  },
+  {
+    "source": "Epilepsy",
+    "target": "Dizziness",
+    "relationship_type": "presents_as",
+    "properties": {
+      "strength": "strong",
+      "evidence": "well-established",
+      "description": "Dizziness is often a symptom of Epilepsy."
+    }
+  },
+  {
+    "source": "Osteoarthritis",
+    "target": "Joint Pain",
+    "relationship_type": "presents_as",
+    "properties": {
+      "strength": "strong",
+      "evidence": "well-established",
+      "description": "Joint pain is a hallmark symptom of Osteoarthritis."
+    }
+  },
+  {
+    "source": "Hypertension",
+    "target": "Shortness of Breath",
+    "relationship_type": "presents_as",
+    "properties": {
+      "strength": "moderate",
+      "evidence": "emerging",
+      "description": "Shortness of breath can occur in severe cases of Hypertension."
+    }
+  },
+  {
+    "source": "Chronic Pain Syndrome",
+    "target": "Insomnia",
+    "relationship_type": "presents_as",
+    "properties": {
+      "strength": "strong",
+      "evidence": "well-established",
+      "description": "Chronic pain often leads to insomnia."
+    }
+  },
+  {
+    "source": "Type 2 Diabetes",
+    "target": "Weight Gain",
+    "relationship_type": "presents_as",
+    "properties": {
+      "strength": "strong",
+      "evidence": "well-established",
+      "description": "Weight gain is frequently observed in patients with Type 2 Diabetes."
+    }
+  },
+  {
+    "source": "Metformin",
+    "target": "SLC22A1",
+    "relationship_type": "targets_gene",
+    "properties": {
+      "strength": "moderate",
+      "evidence": "emerging",
+      "description": "Metformin is known to affect the SLC22A1 gene which is involved in drug transport."
+    }
+  },
+  {
+    "source": "Insulin",
+    "target": "AMPK",
+    "relationship_type": "targets_gene",
+    "properties": {
+      "strength": "moderate",
+      "evidence": "emerging",
+      "description": "Insulin can influence AMPK activity in glucose metabolism."
+    }
+  },
+  {
+    "source": "Gabapentin",
+    "target": "Epilepsy",
+    "relationship_type": "treats",
+    "properties": {
+      "strength": "moderate",
+      "evidence": "emerging",
+      "description": "Gabapentin may be used in the treatment of epilepsy."
+    }
+  },
+  {
+    "source": "Sertraline",
+    "target": "Insomnia",
+    "relationship_type": "causes_side_effect",
+    "properties": {
+      "strength": "moderate",
+      "evidence": "emerging",
+      "description": "Insomnia is a possible side effect of Sertraline."
+    }
+  },
+  {
+    "source": "Warfarin",
+    "target": "Insomnia",
+    "relationship_type": "causes_side_effect",
+    "properties": {
+      "strength": "weak",
+      "evidence": "theoretical",
+      "description": "Insomnia could be indirectly related to the pain of DVT which Warfarin treats."
+    }
+  },
+  {
+    "source": "Atorvastatin",
+    "target": "Dizziness",
+    "relationship_type": "causes_side_effect",
+    "properties": {
+      "strength": "weak",
+      "evidence": "emerging",
+      "description": "Dizziness can occur as a rare side effect of Atorvastatin."
+    }
+  },
+  {
+    "source": "Prednisone",
+    "target": "Weight Gain",
+    "relationship_type": "causes_side_effect",
+    "properties": {
+      "strength": "strong",
+      "evidence": "well-established",
+      "description": "Weight gain is a common side effect of Prednisone."
+    }
+  },
+  {
+    "source": "Methotrexate",
+    "target": "Weight Gain",
+    "relationship_type": "causes_side_effect",
+    "properties": {
+      "strength": "weak",
+      "evidence": "emerging",
+      "description": "Weight gain can occur as an indirect effect of Methotrexate treatment."
+    }
+  },
+  {
+    "source": "Aspirin",
+    "target": "Joint Pain",
+    "relationship_type": "treats",
+    "properties": {
+      "strength": "strong",
+      "evidence": "well-established",
+      "description": "Aspirin is often used to alleviate joint pain due to inflammation."
+    }
+  },
+  {
+    "source": "Metformin",
+    "target": "Cholesterol Metabolism Pathway",
+    "relationship_type": "involves_pathway",
+    "properties": {
+      "strength": "moderate",
+      "evidence": "emerging",
+      "description": "Metformin may influence cholesterol metabolism as part of its action on diabetes."
+    }
+  },
+  {
+    "source": "Gabapentin",
+    "target": "Pain Signaling Pathway",
+    "relationship_type": "involves_pathway",
+    "properties": {
+      "strength": "strong",
+      "evidence": "well-established",
+      "description": "Gabapentin acts on the Pain Signaling Pathway to reduce pain perception."
+    }
+  },
+  {
+    "source": "Sertraline",
+    "target": "Serotonin Pathway",
+    "relationship_type": "involves_pathway",
+    "properties": {
+      "strength": "strong",
+      "evidence": "well-established",
+      "description": "Sertraline acts on the Serotonin Pathway to enhance mood."
+    }
+  },
+  {
+    "source": "Prednisone",
+    "target": "Inflammatory Response Pathway",
+    "relationship_type": "involves_pathway",
+    "properties": {
+      "strength": "strong",
+      "evidence": "well-established",
+      "description": "Prednisone modulates the Inflammatory Response Pathway to reduce inflammation."
+    }
+  },
+  {
+    "source": "Ibuprofen",
+    "target": "Pain Signaling Pathway",
+    "relationship_type": "involves_pathway",
+    "properties": {
+      "strength": "strong",
+      "evidence": "well-established",
+      "description": "Ibuprofen inhibits pain signaling through its anti-inflammatory effects."
+    }
+  },
+  {
+    "source": "Lisinopril",
+    "target": "Renin-Angiotensin System",
+    "relationship_type": "involves_pathway",
+    "properties": {
+      "strength": "strong",
+      "evidence": "well-established",
+      "description": "Lisinopril affects the Renin-Angiotensin System to lower blood pressure."
+    }
+  },
+  {
+    "source": "Warfarin",
+    "target": "Coagulation Cascade",
+    "relationship_type": "involves_pathway",
+    "properties": {
+      "strength": "strong",
+      "evidence": "well-established",
+      "description": "Warfarin influences the Coagulation Cascade to prevent blood clotting."
+    }
+  },
+  {
+    "source": "Clopidogrel",
+    "target": "Coagulation Cascade",
+    "relationship_type": "involves_pathway",
+    "properties": {
+      "strength": "strong",
+      "evidence": "well-established",
+      "description": "Clopidogrel acts on the Coagulation Cascade to prevent thrombus formation."
+    }
+  },
+  {
+    "source": "Aspirin",
+    "target": "Coagulation Cascade",
+    "relationship_type": "involves_pathway",
+    "properties": {
+      "strength": "strong",
+      "evidence": "well-established",
+      "description": "Aspirin affects the Coagulation Cascade, inhibiting platelet aggregation."
+    }
+  },
+  {
+    "source": "Gabapentin",
+    "target": "SLC22A1",
+    "relationship_type": "targets_gene",
+    "properties": {
+      "strength": "weak",
+      "evidence": "theoretical",
+      "description": "Gabapentin may influence the SLC22A1 gene related to drug transport."
+    }
+  },
+  {
+    "source": "Amoxicillin",
+    "target": "Infectious Disease",
+    "relationship_type": "treats",
+    "properties": {
+      "strength": "strong",
+      "evidence": "well-established",
+      "description": "Amoxicillin is widely used to treat various bacterial infections."
+    }
+  },
+  {
+    "source": "Warfarin",
+    "target": "Ibuprofen",
+    "relationship_type": "interacts_with",
+    "properties": {
+      "strength": "high",
+      "evidence": "clinical studies",
+      "description": "Warfarin may have an increased risk of bleeding when taken with Ibuprofen."
+    }
+  },
+  {
+    "source": "Warfarin",
+    "target": "Clopidogrel",
+    "relationship_type": "interacts_with",
+    "properties": {
+      "strength": "high",
+      "evidence": "clinical guidelines",
+      "description": "Co-administration may lead to a higher risk of bleeding."
+    }
+  },
+  {
+    "source": "Warfarin",
+    "target": "Omeprazole",
+    "relationship_type": "interacts_with",
+    "properties": {
+      "strength": "moderate",
+      "evidence": "clinical studies",
+      "description": "Omeprazole can affect Warfarin metabolism, altering its effectiveness."
+    }
+  },
+  {
+    "source": "Warfarin",
+    "target": "Amoxicillin",
+    "relationship_type": "interacts_with",
+    "properties": {
+      "strength": "moderate",
+      "evidence": "clinical studies",
+      "description": "Amoxicillin may increase the anticoagulant effect of Warfarin."
+    }
+  },
+  {
+    "source": "Metformin",
+    "target": "Prednisone",
+    "relationship_type": "interacts_with",
+    "properties": {
+      "strength": "moderate",
+      "evidence": "clinical studies",
+      "description": "Prednisone may reduce the effectiveness of Metformin."
+    }
+  },
+  {
+    "source": "Metformin",
+    "target": "Lisinopril",
+    "relationship_type": "interacts_with",
+    "properties": {
+      "strength": "low",
+      "evidence": "clinical guidelines",
+      "description": "No significant interaction, but caution is advised in renal impairment."
+    }
+  },
+  {
+    "source": "Sertraline",
+    "target": "Ibuprofen",
+    "relationship_type": "interacts_with",
+    "properties": {
+      "strength": "moderate",
+      "evidence": "clinical studies",
+      "description": "Increased risk of gastrointestinal bleeding when used together."
+    }
+  },
+  {
+    "source": "Sertraline",
+    "target": "Aspirin",
+    "relationship_type": "interacts_with",
+    "properties": {
+      "strength": "moderate",
+      "evidence": "clinical studies",
+      "description": "Potential increased risk of bleeding with combined use."
+    }
+  },
+  {
+    "source": "Sertraline",
+    "target": "Gabapentin",
+    "relationship_type": "interacts_with",
+    "properties": {
+      "strength": "low",
+      "evidence": "clinical guidelines",
+      "description": "No significant interaction but monitor for side effects."
+    }
+  },
+  {
+    "source": "Atorvastatin",
+    "target": "Omeprazole",
+    "relationship_type": "interacts_with",
+    "properties": {
+      "strength": "moderate",
+      "evidence": "clinical studies",
+      "description": "Omeprazole may increase Atorvastatin levels in the blood."
+    }
+  },
+  {
+    "source": "Atorvastatin",
+    "target": "Amoxicillin",
+    "relationship_type": "interacts_with",
+    "properties": {
+      "strength": "low",
+      "evidence": "clinical guidelines",
+      "description": "Minimal interaction; monitor for unusual side effects."
+    }
+  },
+  {
+    "source": "Prednisone",
+    "target": "Aspirin",
+    "relationship_type": "interacts_with",
+    "properties": {
+      "strength": "high",
+      "evidence": "clinical studies",
+      "description": "Increased risk of gastrointestinal bleeding when used together."
+    }
+  },
+  {
+    "source": "Prednisone",
+    "target": "Ibuprofen",
+    "relationship_type": "interacts_with",
+    "properties": {
+      "strength": "high",
+      "evidence": "clinical studies",
+      "description": "Increased risk of gastrointestinal complications."
+    }
+  },
+  {
+    "source": "Prednisone",
+    "target": "Methotrexate",
+    "relationship_type": "interacts_with",
+    "properties": {
+      "strength": "high",
+      "evidence": "clinical studies",
+      "description": "Increased risk of toxicity when combined with Methotrexate."
+    }
+  },
+  {
+    "source": "Prednisone",
+    "target": "Insulin",
+    "relationship_type": "interacts_with",
+    "properties": {
+      "strength": "moderate",
+      "evidence": "clinical guidelines",
+      "description": "May require adjustments in Insulin dosage due to glucose metabolism changes."
+    }
+  },
+  {
+    "source": "Atrial Fibrillation",
+    "target": "Fatigue",
+    "relationship_type": "presents_as",
+    "properties": {
+      "strength": "moderate",
+      "evidence": "clinical studies",
+      "description": "Patients with Atrial Fibrillation often report feelings of fatigue due to decreased cardiac output."
+    }
+  },
+  {
+    "source": "Heart Failure",
+    "target": "Fatigue",
+    "relationship_type": "presents_as",
+    "properties": {
+      "strength": "strong",
+      "evidence": "patient surveys",
+      "description": "Fatigue is a common symptom in heart failure patients due to poor circulation and oxygen delivery."
+    }
+  },
+  {
+    "source": "Hypothyroidism",
+    "target": "Fatigue",
+    "relationship_type": "presents_as",
+    "properties": {
+      "strength": "strong",
+      "evidence": "endocrinology literature",
+      "description": "Fatigue is a hallmark symptom of hypothyroidism due to slowed metabolism."
+    }
+  },
+  {
+    "source": "Major Depression",
+    "target": "Fatigue",
+    "relationship_type": "presents_as",
+    "properties": {
+      "strength": "strong",
+      "evidence": "psychiatric studies",
+      "description": "Fatigue is frequently reported in major depression as a result of emotional and physical distress."
+    }
+  },
+  {
+    "source": "Atrial Fibrillation",
+    "target": "Shortness of Breath",
+    "relationship_type": "presents_as",
+    "properties": {
+      "strength": "strong",
+      "evidence": "clinical observations",
+      "description": "Shortness of breath is common in Atrial Fibrillation due to irregular heartbeats affecting lung perfusion."
+    }
+  },
+  {
+    "source": "Heart Failure",
+    "target": "Shortness of Breath",
+    "relationship_type": "presents_as",
+    "properties": {
+      "strength": "strong",
+      "evidence": "patient case studies",
+      "description": "Heart failure often presents with shortness of breath due to fluid accumulation in the lungs."
+    }
+  },
+  {
+    "source": "Deep Vein Thrombosis",
+    "target": "Swelling",
+    "relationship_type": "presents_as",
+    "properties": {
+      "strength": "moderate",
+      "evidence": "clinical guidelines",
+      "description": "Swelling in the affected limb is a common symptom of Deep Vein Thrombosis."
+    }
+  },
+  {
+    "source": "Heart Failure",
+    "target": "Swelling",
+    "relationship_type": "presents_as",
+    "properties": {
+      "strength": "strong",
+      "evidence": "clinical observations",
+      "description": "Swelling in the lower extremities can occur due to fluid retention in heart failure."
+    }
+  },
+  {
+    "source": "Aspirin",
+    "target": "Headache",
+    "relationship_type": "presents_as",
+    "properties": {
+      "strength": "moderate",
+      "evidence": "clinical trials",
+      "description": "Aspirin is often used to alleviate headache pain due to its analgesic properties."
+    }
+  },
+  {
+    "source": "Chronic Pain Syndrome",
+    "target": "Headache",
+    "relationship_type": "presents_as",
+    "properties": {
+      "strength": "moderate",
+      "evidence": "patient reports",
+      "description": "Headaches can be a symptom in patients suffering from chronic pain syndromes."
+    }
+  },
+  {
+    "source": "Hypothyroidism",
+    "target": "Weight Gain",
+    "relationship_type": "presents_as",
+    "properties": {
+      "strength": "strong",
+      "evidence": "endocrinology literature",
+      "description": "Patients with hypothyroidism frequently experience weight gain due to a slowed metabolism."
+    }
+  },
+  {
+    "source": "Chronic Pain Syndrome",
+    "target": "Joint Pain",
+    "relationship_type": "presents_as",
+    "properties": {
+      "strength": "strong",
+      "evidence": "clinical guidelines",
+      "description": "Joint pain is a prevalent symptom in chronic pain syndromes due to ongoing inflammation."
+    }
+  },
+  {
+    "source": "GERD",
+    "target": "Nausea",
+    "relationship_type": "presents_as",
+    "properties": {
+      "strength": "moderate",
+      "evidence": "gastroenterology studies",
+      "description": "Nausea can occur as a symptom of gastroesophageal reflux disease (GERD)."
+    }
+  },
+  {
+    "source": "Chronic Pain Syndrome",
+    "target": "Nausea",
+    "relationship_type": "presents_as",
+    "properties": {
+      "strength": "moderate",
+      "evidence": "clinical reviews",
+      "description": "Patients with chronic pain syndromes may experience nausea due to varying pain levels."
+    }
+  },
+  {
+    "source": "Hypothyroidism",
+    "target": "Nausea",
+    "relationship_type": "presents_as",
+    "properties": {
+      "strength": "weak",
+      "evidence": "case studies",
+      "description": "Occasional nausea may be reported by patients with hypothyroidism, although less common."
+    }
+  },
+  {
+    "source": "Epilepsy",
+    "target": "Nausea",
+    "relationship_type": "presents_as",
+    "properties": {
+      "strength": "moderate",
+      "evidence": "neurology literature",
+      "description": "Nausea can be a symptom associated with seizures in epilepsy."
+    }
+  },
+  {
+    "source": "Hypertension",
+    "target": "Dizziness",
+    "relationship_type": "presents_as",
+    "properties": {
+      "strength": "strong",
+      "evidence": "cardiovascular studies",
+      "description": "Dizziness is often reported in patients with hypertension due to altered blood flow."
+    }
+  },
+  {
+    "source": "Heart Failure",
+    "target": "Dizziness",
+    "relationship_type": "presents_as",
+    "properties": {
+      "strength": "strong",
+      "evidence": "clinical observations",
+      "description": "Dizziness can occur in heart failure due to insufficient blood supply to the brain."
+    }
+  },
+  {
+    "source": "ACE",
+    "target": "Heart Failure",
+    "relationship_type": "associated_with",
+    "properties": {
+      "strength": "strong",
+      "evidence": "clinical studies",
+      "description": "ACE is involved in the regulation of blood pressure and fluid balance, which are critical factors in heart failure."
+    }
+  },
+  {
+    "source": "ACE",
+    "target": "Hypertension",
+    "relationship_type": "associated_with",
+    "properties": {
+      "strength": "strong",
+      "evidence": "clinical studies",
+      "description": "ACE regulates the renin-angiotensin system, influencing blood pressure levels."
+    }
+  },
+  {
+    "source": "VKORC1",
+    "target": "Atrial Fibrillation",
+    "relationship_type": "associated_with",
+    "properties": {
+      "strength": "moderate",
+      "evidence": "genetic association studies",
+      "description": "VKORC1 polymorphisms have been linked to the efficacy of anticoagulation therapy in atrial fibrillation patients."
+    }
+  },
+  {
+    "source": "VKORC1",
+    "target": "Deep Vein Thrombosis",
+    "relationship_type": "associated_with",
+    "properties": {
+      "strength": "moderate",
+      "evidence": "clinical studies",
+      "description": "Alterations in VKORC1 can affect coagulation pathways, increasing the risk of thrombotic events."
+    }
+  },
+  {
+    "source": "AMPK",
+    "target": "Type 2 Diabetes",
+    "relationship_type": "associated_with",
+    "properties": {
+      "strength": "strong",
+      "evidence": "clinical studies",
+      "description": "AMPK plays a crucial role in glucose and lipid metabolism, influencing insulin sensitivity."
+    }
+  },
+  {
+    "source": "CYP2D6",
+    "target": "Major Depression",
+    "relationship_type": "associated_with",
+    "properties": {
+      "strength": "strong",
+      "evidence": "pharmacogenomic studies",
+      "description": "CYP2D6 is involved in the metabolism of antidepressants, affecting treatment outcomes in depression."
+    }
+  },
+  {
+    "source": "COX-2",
+    "target": "Chronic Pain Syndrome",
+    "relationship_type": "associated_with",
+    "properties": {
+      "strength": "strong",
+      "evidence": "clinical trials",
+      "description": "COX-2 is a target for NSAIDs used to manage chronic pain conditions."
+    }
+  },
+  {
+    "source": "COX-2",
+    "target": "Osteoarthritis",
+    "relationship_type": "associated_with",
+    "properties": {
+      "strength": "strong",
+      "evidence": "clinical studies",
+      "description": "COX-2 is upregulated in osteoarthritis, contributing to pain and inflammation."
+    }
+  },
+  {
+    "source": "COX-2",
+    "target": "Rheumatoid Arthritis",
+    "relationship_type": "associated_with",
+    "properties": {
+      "strength": "strong",
+      "evidence": "clinical investigations",
+      "description": "COX-2 plays a significant role in the inflammatory processes involved in rheumatoid arthritis."
+    }
+  },
+  {
+    "source": "TNF-alpha",
+    "target": "Rheumatoid Arthritis",
+    "relationship_type": "associated_with",
+    "properties": {
+      "strength": "strong",
+      "evidence": "clinical studies",
+      "description": "TNF-alpha is a key cytokine involved in the inflammatory response in rheumatoid arthritis."
+    }
+  },
+  {
+    "source": "PCSK9",
+    "target": "Hypertension",
+    "relationship_type": "associated_with",
+    "properties": {
+      "strength": "moderate",
+      "evidence": "genetic studies",
+      "description": "PCSK9 variations are associated with lipid levels influencing cardiovascular health, indirectly affecting hypertension."
+    }
+  },
+  {
+    "source": "HLA-B",
+    "target": "Rheumatoid Arthritis",
+    "relationship_type": "associated_with",
+    "properties": {
+      "strength": "moderate",
+      "evidence": "genetic associations",
+      "description": "Certain HLA-B alleles are associated with increased susceptibility to autoimmune conditions like rheumatoid arthritis."
+    }
+  },
+  {
+    "source": "MTHFR",
+    "target": "Chronic Pain Syndrome",
+    "relationship_type": "associated_with",
+    "properties": {
+      "strength": "moderate",
+      "evidence": "genetic studies",
+      "description": "MTHFR polymorphisms may influence pain perception and chronic pain development."
+    }
+  },
+  {
+    "source": "MTHFR",
+    "target": "Type 2 Diabetes",
+    "relationship_type": "associated_with",
+    "properties": {
+      "strength": "moderate",
+      "evidence": "epidemiological studies",
+      "description": "MTHFR genetic variations can affect homocysteine levels, which are linked to insulin resistance and type 2 diabetes."
+    }
+  },
+  {
+    "source": "CYP2D6",
+    "target": "Chronic Pain Syndrome",
+    "relationship_type": "associated_with",
+    "properties": {
+      "strength": "moderate",
+      "evidence": "pharmacogenomic research",
+      "description": "CYP2D6 polymorphisms can affect the metabolism of pain medications used in chronic pain management."
+    }
+  },
+  {
+    "source": "ACE",
+    "target": "Renin-Angiotensin System",
+    "relationship_type": "part_of_pathway",
+    "properties": {
+      "strength": "high",
+      "evidence": "ACE is crucial for the conversion of angiotensin I to angiotensin II, a key component of the Renin-Angiotensin System.",
+      "description": "ACE plays a vital role in regulating blood pressure and fluid balance via the Renin-Angiotensin System."
+    }
+  },
+  {
+    "source": "VKORC1",
+    "target": "Coagulation Cascade",
+    "relationship_type": "part_of_pathway",
+    "properties": {
+      "strength": "high",
+      "evidence": "VKORC1 is essential for the activation of vitamin K-dependent clotting factors.",
+      "description": "VKORC1 is a critical component of the Coagulation Cascade that affects blood coagulation."
+    }
+  },
+  {
+    "source": "CYP2D6",
+    "target": "Serotonin Pathway",
+    "relationship_type": "part_of_pathway",
+    "properties": {
+      "strength": "moderate",
+      "evidence": "CYP2D6 metabolizes several antidepressants that act on serotonin levels.",
+      "description": "CYP2D6 is involved in the metabolism of drugs affecting the Serotonin Pathway."
+    }
+  },
+  {
+    "source": "AMPK",
+    "target": "Insulin Signaling Pathway",
+    "relationship_type": "part_of_pathway",
+    "properties": {
+      "strength": "high",
+      "evidence": "AMPK activation enhances insulin sensitivity and glucose uptake.",
+      "description": "AMPK is a key regulator of energy homeostasis within the Insulin Signaling Pathway."
+    }
+  },
+  {
+    "source": "COX-2",
+    "target": "Inflammatory Response Pathway",
+    "relationship_type": "part_of_pathway",
+    "properties": {
+      "strength": "high",
+      "evidence": "COX-2 is induced during inflammation and mediates the production of pro-inflammatory prostaglandins.",
+      "description": "COX-2 is an important enzyme in the Inflammatory Response Pathway."
+    }
+  },
+  {
+    "source": "COX-2",
+    "target": "Pain Signaling Pathway",
+    "relationship_type": "part_of_pathway",
+    "properties": {
+      "strength": "high",
+      "evidence": "COX-2-derived prostaglandins sensitize nociceptive neurons, contributing to pain.",
+      "description": "COX-2 is involved in modulating pain perception within the Pain Signaling Pathway."
+    }
+  },
+  {
+    "source": "TNF-alpha",
+    "target": "Inflammatory Response Pathway",
+    "relationship_type": "part_of_pathway",
+    "properties": {
+      "strength": "high",
+      "evidence": "TNF-alpha is a major pro-inflammatory cytokine that coordinates the inflammatory response.",
+      "description": "TNF-alpha plays a crucial role in the Inflammatory Response Pathway."
+    }
+  },
+  {
+    "source": "PCSK9",
+    "target": "Cholesterol Metabolism Pathway",
+    "relationship_type": "part_of_pathway",
+    "properties": {
+      "strength": "high",
+      "evidence": "PCSK9 regulates LDL receptor degradation, impacting cholesterol levels.",
+      "description": "PCSK9 is a key regulator in the Cholesterol Metabolism Pathway."
+    }
+  },
+  {
+    "source": "SLC22A1",
+    "target": "Insulin Signaling Pathway",
+    "relationship_type": "part_of_pathway",
+    "properties": {
+      "strength": "moderate",
+      "evidence": "SLC22A1 facilitates the transport of glucose and other metabolites important for insulin signaling.",
+      "description": "SLC22A1 is involved in the transport processes within the Insulin Signaling Pathway."
+    }
+  },
+  {
+    "source": "MTHFR",
+    "target": "Thyroid Hormone Pathway",
+    "relationship_type": "part_of_pathway",
+    "properties": {
+      "strength": "moderate",
+      "evidence": "MTHFR affects folate metabolism, which is essential for thyroid hormone synthesis.",
+      "description": "MTHFR is involved in the metabolic pathways that support thyroid hormone production."
+    }
+  },
+  {
+    "source": "MTHFR",
+    "target": "Cholesterol Metabolism Pathway",
+    "relationship_type": "part_of_pathway",
+    "properties": {
+      "strength": "moderate",
+      "evidence": "MTHFR plays a role in homocysteine metabolism, which impacts cholesterol levels.",
+      "description": "MTHFR contributes to the regulation of the Cholesterol Metabolism Pathway."
+    }
+  },
+  {
+    "source": "MTHFR",
+    "target": "Insulin Signaling Pathway",
+    "relationship_type": "part_of_pathway",
+    "properties": {
+      "strength": "moderate",
+      "evidence": "MTHFR influences metabolic pathways that affect insulin sensitivity.",
+      "description": "MTHFR is involved in the biochemical processes in the Insulin Signaling Pathway."
+    }
+  },
+  {
+    "source": "Amoxicillin",
+    "target": "Nausea",
+    "relationship_type": "causes_side_effect",
+    "properties": {
+      "strength": "moderate",
+      "evidence": "clinical studies",
+      "description": "Amoxicillin commonly causes nausea as a side effect."
+    }
+  },
+  {
+    "source": "Amoxicillin",
+    "target": "Dizziness",
+    "relationship_type": "causes_side_effect",
+    "properties": {
+      "strength": "low",
+      "evidence": "case reports",
+      "description": "Some patients report dizziness while taking Amoxicillin."
+    }
+  },
+  {
+    "source": "Aspirin",
+    "target": "Stomach Pain",
+    "relationship_type": "causes_side_effect",
+    "properties": {
+      "strength": "moderate",
+      "evidence": "clinical studies",
+      "description": "Aspirin may cause stomach pain due to irritation."
+    }
+  },
+  {
+    "source": "Atorvastatin",
+    "target": "Muscle Weakness",
+    "relationship_type": "causes_side_effect",
+    "properties": {
+      "strength": "moderate",
+      "evidence": "clinical trials",
+      "description": "Atorvastatin can lead to muscle weakness in some patients."
+    }
+  },
+  {
+    "source": "Atorvastatin",
+    "target": "Fatigue",
+    "relationship_type": "causes_side_effect",
+    "properties": {
+      "strength": "low",
+      "evidence": "case studies",
+      "description": "Fatigue has been reported by some patients taking Atorvastatin."
+    }
+  },
+  {
+    "source": "Clopidogrel",
+    "target": "Dizziness",
+    "relationship_type": "causes_side_effect",
+    "properties": {
+      "strength": "moderate",
+      "evidence": "clinical observations",
+      "description": "Dizziness can occur in patients using Clopidogrel."
+    }
+  },
+  {
+    "source": "Ibuprofen",
+    "target": "Stomach Pain",
+    "relationship_type": "causes_side_effect",
+    "properties": {
+      "strength": "high",
+      "evidence": "clinical studies",
+      "description": "Ibuprofen is associated with stomach pain due to irritation."
+    }
+  },
+  {
+    "source": "Ibuprofen",
+    "target": "Swelling",
+    "relationship_type": "causes_side_effect",
+    "properties": {
+      "strength": "low",
+      "evidence": "case reports",
+      "description": "Some individuals may experience swelling while taking Ibuprofen."
+    }
+  },
+  {
+    "source": "Metformin",
+    "target": "Nausea",
+    "relationship_type": "causes_side_effect",
+    "properties": {
+      "strength": "high",
+      "evidence": "clinical trials",
+      "description": "Nausea is a common side effect of Metformin."
+    }
+  },
+  {
+    "source": "Metformin",
+    "target": "Stomach Pain",
+    "relationship_type": "causes_side_effect",
+    "properties": {
+      "strength": "moderate",
+      "evidence": "clinical studies",
+      "description": "Metformin can cause stomach pain in some patients."
+    }
+  },
+  {
+    "source": "Prednisone",
+    "target": "Insomnia",
+    "relationship_type": "causes_side_effect",
+    "properties": {
+      "strength": "moderate",
+      "evidence": "clinical observations",
+      "description": "Insomnia can occur as a side effect of Prednisone."
+    }
+  },
+  {
+    "source": "Warfarin",
+    "target": "Heart Failure",
+    "relationship_type": "contraindicated",
+    "properties": {
+      "strength": "high",
+      "evidence": "clinical guidelines",
+      "description": "Warfarin is contraindicated in patients with heart failure."
+    }
+  },
+  {
+    "source": "Aspirin",
+    "target": "Chronic Pain Syndrome",
+    "relationship_type": "contraindicated",
+    "properties": {
+      "strength": "moderate",
+      "evidence": "clinical studies",
+      "description": "Aspirin should be used cautiously in chronic pain syndrome."
+    }
+  },
+  {
+    "source": "Clopidogrel",
+    "target": "Deep Vein Thrombosis",
+    "relationship_type": "contraindicated",
+    "properties": {
+      "strength": "high",
+      "evidence": "clinical guidelines",
+      "description": "Clopidogrel is contraindicated in episodes of deep vein thrombosis."
+    }
+  },
+  {
+    "source": "Ibuprofen",
+    "target": "Heart Failure",
+    "relationship_type": "contraindicated",
+    "properties": {
+      "strength": "high",
+      "evidence": "clinical guidelines",
+      "description": "Ibuprofen is contraindicated in patients with heart failure."
+    }
+  },
+  {
+    "source": "Sertraline",
+    "target": "Major Depression",
+    "relationship_type": "contraindicated",
+    "properties": {
+      "strength": "moderate",
+      "evidence": "clinical studies",
+      "description": "Sertraline may not be suitable for all cases of major depression."
+    }
+  }
+]

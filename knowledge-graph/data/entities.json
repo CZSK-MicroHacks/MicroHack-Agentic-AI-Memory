@@ -1,0 +1,600 @@
+[
+  {
+    "node_type": "drug",
+    "name": "Warfarin",
+    "description": "Warfarin is an anticoagulant medication used to prevent blood clots. It works by inhibiting vitamin K epoxide reductase, which is critical for the synthesis of clotting factors.",
+    "properties": {
+      "drug_class": "Anticoagulant",
+      "mechanism": "Vitamin K antagonist",
+      "route": "oral"
+    }
+  },
+  {
+    "node_type": "drug",
+    "name": "Metformin",
+    "description": "Metformin is an oral hypoglycemic agent primarily used to treat Type 2 Diabetes. It improves insulin sensitivity and decreases hepatic glucose production.",
+    "properties": {
+      "drug_class": "Biguanide",
+      "mechanism": "Increases insulin sensitivity",
+      "route": "oral"
+    }
+  },
+  {
+    "node_type": "drug",
+    "name": "Lisinopril",
+    "description": "Lisinopril is an ACE inhibitor used to treat hypertension and heart failure. It works by relaxing blood vessels, which lowers blood pressure.",
+    "properties": {
+      "drug_class": "ACE Inhibitor",
+      "mechanism": "Inhibition of angiotensin-converting enzyme",
+      "route": "oral"
+    }
+  },
+  {
+    "node_type": "drug",
+    "name": "Sertraline",
+    "description": "Sertraline is a selective serotonin reuptake inhibitor (SSRI) used to treat major depression and anxiety disorders. It increases serotonin levels in the brain.",
+    "properties": {
+      "drug_class": "Antidepressant",
+      "mechanism": "Serotonin reuptake inhibition",
+      "route": "oral"
+    }
+  },
+  {
+    "node_type": "drug",
+    "name": "Ibuprofen",
+    "description": "Ibuprofen is a nonsteroidal anti-inflammatory drug (NSAID) used to relieve pain, reduce inflammation, and lower fever. It works by inhibiting cyclooxygenase enzymes.",
+    "properties": {
+      "drug_class": "NSAID",
+      "mechanism": "COX inhibition",
+      "route": "oral"
+    }
+  },
+  {
+    "node_type": "drug",
+    "name": "Aspirin",
+    "description": "Aspirin is an NSAID that is widely used to relieve pain and reduce the risk of heart attacks. It irreversibly inhibits cyclooxygenase-1 and -2.",
+    "properties": {
+      "drug_class": "NSAID",
+      "mechanism": "COX inhibition",
+      "route": "oral"
+    }
+  },
+  {
+    "node_type": "drug",
+    "name": "Methotrexate",
+    "description": "Methotrexate is an antimetabolite and immunosuppressant used in the treatment of rheumatoid arthritis and certain cancers. It inhibits dihydrofolate reductase.",
+    "properties": {
+      "drug_class": "Antimetabolite",
+      "mechanism": "Folate antagonist",
+      "route": "oral|iv"
+    }
+  },
+  {
+    "node_type": "drug",
+    "name": "Insulin",
+    "description": "Insulin is a hormone used as a medication to control blood glucose levels in diabetes. It facilitates the uptake of glucose by tissues.",
+    "properties": {
+      "drug_class": "Hormone",
+      "mechanism": "Glucose uptake facilitation",
+      "route": "subcutaneous|iv"
+    }
+  },
+  {
+    "node_type": "drug",
+    "name": "Atorvastatin",
+    "description": "Atorvastatin is a statin medication used to lower cholesterol levels and reduce cardiovascular disease risk. It inhibits HMG-CoA reductase.",
+    "properties": {
+      "drug_class": "Statin",
+      "mechanism": "HMG-CoA reductase inhibition",
+      "route": "oral"
+    }
+  },
+  {
+    "node_type": "drug",
+    "name": "Omeprazole",
+    "description": "Omeprazole is a proton pump inhibitor used to treat gastroesophageal reflux disease (GERD). It reduces stomach acid production.",
+    "properties": {
+      "drug_class": "Proton Pump Inhibitor",
+      "mechanism": "Inhibition of the proton pump",
+      "route": "oral"
+    }
+  },
+  {
+    "node_type": "drug",
+    "name": "Clopidogrel",
+    "description": "Clopidogrel is an antiplatelet medication used to prevent strokes and heart attacks. It works by inhibiting platelet aggregation.",
+    "properties": {
+      "drug_class": "Antiplatelet",
+      "mechanism": "ADP receptor antagonist",
+      "route": "oral"
+    }
+  },
+  {
+    "node_type": "drug",
+    "name": "Amoxicillin",
+    "description": "Amoxicillin is an antibiotic used to treat various bacterial infections. It works by inhibiting cell wall synthesis in bacteria.",
+    "properties": {
+      "drug_class": "Penicillin",
+      "mechanism": "Cell wall synthesis inhibition",
+      "route": "oral"
+    }
+  },
+  {
+    "node_type": "drug",
+    "name": "Prednisone",
+    "description": "Prednisone is a corticosteroid used to treat inflammatory conditions and autoimmune diseases. It suppresses the immune response.",
+    "properties": {
+      "drug_class": "Corticosteroid",
+      "mechanism": "Immunosuppression",
+      "route": "oral|iv"
+    }
+  },
+  {
+    "node_type": "drug",
+    "name": "Levothyroxine",
+    "description": "Levothyroxine is a synthetic thyroid hormone used to treat hypothyroidism. It restores normal levels of thyroid hormone in the body.",
+    "properties": {
+      "drug_class": "Thyroid Hormone",
+      "mechanism": "Thyroid hormone replacement",
+      "route": "oral"
+    }
+  },
+  {
+    "node_type": "drug",
+    "name": "Gabapentin",
+    "description": "Gabapentin is an anticonvulsant medication used to treat neuropathic pain and seizures. It modulates calcium channels to reduce excitability.",
+    "properties": {
+      "drug_class": "Anticonvulsant",
+      "mechanism": "Calcium channel modulation",
+      "route": "oral"
+    }
+  },
+  {
+    "node_type": "disease",
+    "name": "Type 2 Diabetes",
+    "description": "Type 2 Diabetes is a chronic condition characterized by insulin resistance and high blood sugar levels. It can lead to serious health complications if not managed.",
+    "properties": {
+      "category": "Metabolic disorder",
+      "prevalence": "common",
+      "chronic": true
+    }
+  },
+  {
+    "node_type": "disease",
+    "name": "Hypertension",
+    "description": "Hypertension, or high blood pressure, is a common condition that can lead to serious cardiovascular diseases if left untreated. It often requires ongoing management.",
+    "properties": {
+      "category": "Cardiovascular disease",
+      "prevalence": "common",
+      "chronic": true
+    }
+  },
+  {
+    "node_type": "disease",
+    "name": "Rheumatoid Arthritis",
+    "description": "Rheumatoid Arthritis is an autoimmune disorder that causes chronic inflammation of the joints. It can lead to joint damage and disability.",
+    "properties": {
+      "category": "Autoimmune disease",
+      "prevalence": "common",
+      "chronic": true
+    }
+  },
+  {
+    "node_type": "disease",
+    "name": "Major Depression",
+    "description": "Major Depression is a severe mood disorder that affects how a person feels, thinks, and handles daily activities. It can significantly impair quality of life.",
+    "properties": {
+      "category": "Mental health disorder",
+      "prevalence": "common",
+      "chronic": true
+    }
+  },
+  {
+    "node_type": "disease",
+    "name": "Atrial Fibrillation",
+    "description": "Atrial Fibrillation is an irregular heartbeat that can lead to blood clots, stroke, and other heart-related complications. It often requires anticoagulation therapy.",
+    "properties": {
+      "category": "Cardiovascular disease",
+      "prevalence": "common",
+      "chronic": true
+    }
+  },
+  {
+    "node_type": "disease",
+    "name": "Chronic Pain Syndrome",
+    "description": "Chronic Pain Syndrome is a condition characterized by persistent pain lasting longer than 3 months. It can be associated with various underlying diseases.",
+    "properties": {
+      "category": "Pain disorder",
+      "prevalence": "common",
+      "chronic": true
+    }
+  },
+  {
+    "node_type": "disease",
+    "name": "Hypothyroidism",
+    "description": "Hypothyroidism is a condition where the thyroid gland does not produce enough hormones, leading to symptoms like fatigue and weight gain. It can be managed with thyroid hormone replacement.",
+    "properties": {
+      "category": "Endocrine disorder",
+      "prevalence": "common",
+      "chronic": true
+    }
+  },
+  {
+    "node_type": "disease",
+    "name": "GERD",
+    "description": "Gastroesophageal Reflux Disease (GERD) is a chronic digestive condition where stomach acid flows back into the esophagus, causing symptoms like heartburn. It often requires lifestyle changes and medication.",
+    "properties": {
+      "category": "Gastrointestinal disorder",
+      "prevalence": "common",
+      "chronic": true
+    }
+  },
+  {
+    "node_type": "disease",
+    "name": "Heart Failure",
+    "description": "Heart Failure is a serious condition where the heart cannot pump enough blood to meet the body's needs. It may require medications and lifestyle modifications.",
+    "properties": {
+      "category": "Cardiovascular disease",
+      "prevalence": "common",
+      "chronic": true
+    }
+  },
+  {
+    "node_type": "disease",
+    "name": "Deep Vein Thrombosis",
+    "description": "Deep Vein Thrombosis (DVT) is a condition where blood clots form in deep veins, typically in the legs. It can lead to serious complications such as pulmonary embolism.",
+    "properties": {
+      "category": "Vascular disease",
+      "prevalence": "common",
+      "chronic": false
+    }
+  },
+  {
+    "node_type": "disease",
+    "name": "Epilepsy",
+    "description": "Epilepsy is a neurological disorder characterized by recurrent seizures. It can be managed with anticonvulsant medications.",
+    "properties": {
+      "category": "Neurological disorder",
+      "prevalence": "common",
+      "chronic": true
+    }
+  },
+  {
+    "node_type": "disease",
+    "name": "Osteoarthritis",
+    "description": "Osteoarthritis is a degenerative joint disease characterized by the breakdown of cartilage. It causes pain and stiffness, particularly in weight-bearing joints.",
+    "properties": {
+      "category": "Musculoskeletal disorder",
+      "prevalence": "common",
+      "chronic": true
+    }
+  },
+  {
+    "node_type": "gene",
+    "name": "CYP2D6",
+    "description": "CYP2D6 is a gene that encodes an enzyme involved in the metabolism of many drugs. Genetic variations can affect drug efficacy and safety.",
+    "properties": {
+      "chromosome": "22",
+      "function": "Drug metabolism",
+      "associated_drugs": [
+        "Sertraline",
+        "Metformin",
+        "Clopidogrel"
+      ]
+    }
+  },
+  {
+    "node_type": "gene",
+    "name": "VKORC1",
+    "description": "VKORC1 is a gene encoding the vitamin K epoxide reductase enzyme, which is a target for anticoagulants like Warfarin. Variants influence Warfarin dosing.",
+    "properties": {
+      "chromosome": "16",
+      "function": "Vitamin K metabolism",
+      "associated_drugs": [
+        "Warfarin"
+      ]
+    }
+  },
+  {
+    "node_type": "gene",
+    "name": "ACE",
+    "description": "ACE encodes angiotensin-converting enzyme, a key regulator of blood pressure. It is a target for antihypertensive drugs like Lisinopril.",
+    "properties": {
+      "chromosome": "17",
+      "function": "Regulation of blood pressure",
+      "associated_drugs": [
+        "Lisinopril",
+        "Ramipril"
+      ]
+    }
+  },
+  {
+    "node_type": "gene",
+    "name": "AMPK",
+    "description": "AMPK is a gene that encodes a protein involved in cellular energy homeostasis. It is implicated in metabolic disorders and is a target for diabetes drugs.",
+    "properties": {
+      "chromosome": "1",
+      "function": "Energy regulation",
+      "associated_drugs": [
+        "Metformin"
+      ]
+    }
+  },
+  {
+    "node_type": "gene",
+    "name": "COX-2",
+    "description": "COX-2 encodes an enzyme involved in inflammation and pain. It is a target for NSAIDs like Ibuprofen and Aspirin, which reduce pain and swelling.",
+    "properties": {
+      "chromosome": "1",
+      "function": "Inflammation regulation",
+      "associated_drugs": [
+        "Ibuprofen",
+        "Aspirin"
+      ]
+    }
+  },
+  {
+    "node_type": "gene",
+    "name": "TNF-alpha",
+    "description": "TNF-alpha is a cytokine involved in systemic inflammation and is a target for drugs treating autoimmune diseases like Rheumatoid Arthritis.",
+    "properties": {
+      "chromosome": "6",
+      "function": "Inflammatory response",
+      "associated_drugs": [
+        "Methotrexate"
+      ]
+    }
+  },
+  {
+    "node_type": "gene",
+    "name": "SLC22A1",
+    "description": "SLC22A1 encodes a transporter protein involved in drug uptake. Variants can impact the efficacy of certain medications, particularly in diabetes.",
+    "properties": {
+      "chromosome": "6",
+      "function": "Drug transport",
+      "associated_drugs": [
+        "Metformin"
+      ]
+    }
+  },
+  {
+    "node_type": "gene",
+    "name": "HLA-B",
+    "description": "HLA-B is a gene that codes for a protein involved in the immune response. Certain alleles are associated with drug hypersensitivity reactions.",
+    "properties": {
+      "chromosome": "6",
+      "function": "Immune response regulation",
+      "associated_drugs": [
+        "Abacavir"
+      ]
+    }
+  },
+  {
+    "node_type": "gene",
+    "name": "MTHFR",
+    "description": "MTHFR encodes an enzyme involved in folate metabolism. Genetic variants can affect the metabolism of drugs like Methotrexate.",
+    "properties": {
+      "chromosome": "1",
+      "function": "Folate metabolism",
+      "associated_drugs": [
+        "Methotrexate"
+      ]
+    }
+  },
+  {
+    "node_type": "gene",
+    "name": "PCSK9",
+    "description": "PCSK9 is a gene that encodes a protein involved in cholesterol metabolism. It is a target for cholesterol-lowering therapies.",
+    "properties": {
+      "chromosome": "1",
+      "function": "Cholesterol regulation",
+      "associated_drugs": [
+        "Alirocumab"
+      ]
+    }
+  },
+  {
+    "node_type": "symptom",
+    "name": "Headache",
+    "description": "Headache is a common symptom that can occur in various conditions, including migraines and tension-type headaches. It may require analgesic treatment.",
+    "properties": {
+      "severity": "moderate",
+      "body_system": "Nervous system"
+    }
+  },
+  {
+    "node_type": "symptom",
+    "name": "Fatigue",
+    "description": "Fatigue is a pervasive feeling of tiredness and lack of energy. It can accompany many diseases such as depression and hypothyroidism.",
+    "properties": {
+      "severity": "moderate",
+      "body_system": "General"
+    }
+  },
+  {
+    "node_type": "symptom",
+    "name": "Nausea",
+    "description": "Nausea is an unpleasant sensation often accompanied by the urge to vomit. It can be a side effect of medications or arise from gastrointestinal disorders.",
+    "properties": {
+      "severity": "mild",
+      "body_system": "Gastrointestinal system"
+    }
+  },
+  {
+    "node_type": "symptom",
+    "name": "Joint Pain",
+    "description": "Joint pain is a common symptom in conditions like osteoarthritis and rheumatoid arthritis. It can range from mild discomfort to severe pain.",
+    "properties": {
+      "severity": "moderate",
+      "body_system": "Musculoskeletal system"
+    }
+  },
+  {
+    "node_type": "symptom",
+    "name": "Dizziness",
+    "description": "Dizziness is a sensation of lightheadedness or unsteadiness. It can occur in various medical conditions, including vestibular disorders and dehydration.",
+    "properties": {
+      "severity": "mild",
+      "body_system": "Nervous system"
+    }
+  },
+  {
+    "node_type": "symptom",
+    "name": "Bleeding",
+    "description": "Bleeding can occur from various sites in the body and can be a side effect of anticoagulant medications. It requires prompt medical attention.",
+    "properties": {
+      "severity": "severe",
+      "body_system": "General"
+    }
+  },
+  {
+    "node_type": "symptom",
+    "name": "Muscle Weakness",
+    "description": "Muscle weakness is a reduction in strength that can be caused by neurological disorders, autoimmune diseases, or medication side effects.",
+    "properties": {
+      "severity": "moderate",
+      "body_system": "Musculoskeletal system"
+    }
+  },
+  {
+    "node_type": "symptom",
+    "name": "Insomnia",
+    "description": "Insomnia is a sleep disorder characterized by difficulty falling or staying asleep. It can be associated with depression and anxiety.",
+    "properties": {
+      "severity": "moderate",
+      "body_system": "Nervous system"
+    }
+  },
+  {
+    "node_type": "symptom",
+    "name": "Shortness of Breath",
+    "description": "Shortness of Breath is a sensation of not getting enough air and can be associated with conditions such as asthma, heart failure, and anxiety.",
+    "properties": {
+      "severity": "severe",
+      "body_system": "Respiratory system"
+    }
+  },
+  {
+    "node_type": "symptom",
+    "name": "Swelling",
+    "description": "Swelling is an abnormal enlargement of a body part, often due to inflammation or fluid retention. It can occur in various medical conditions.",
+    "properties": {
+      "severity": "mild",
+      "body_system": "General"
+    }
+  },
+  {
+    "node_type": "symptom",
+    "name": "Weight Gain",
+    "description": "Weight Gain is an increase in body weight that can be caused by various factors including medication side effects, metabolic disorders, and lifestyle changes.",
+    "properties": {
+      "severity": "moderate",
+      "body_system": "General"
+    }
+  },
+  {
+    "node_type": "symptom",
+    "name": "Stomach Pain",
+    "description": "Stomach Pain is a common symptom that can arise from various gastrointestinal issues, including GERD and ulcers. It may require treatment depending on the cause.",
+    "properties": {
+      "severity": "moderate",
+      "body_system": "Gastrointestinal system"
+    }
+  },
+  {
+    "node_type": "pathway",
+    "name": "Renin-Angiotensin System",
+    "description": "The Renin-Angiotensin System is a hormone system that regulates blood pressure and fluid balance. It is a key target for antihypertensive drugs.",
+    "properties": {
+      "biological_system": "Cardiovascular system",
+      "key_molecules": [
+        "Renin",
+        "Angiotensin II"
+      ]
+    }
+  },
+  {
+    "node_type": "pathway",
+    "name": "Coagulation Cascade",
+    "description": "The Coagulation Cascade is a complex series of events that lead to blood clotting. It is crucial for hemostasis and is targeted by anticoagulants.",
+    "properties": {
+      "biological_system": "Hematological system",
+      "key_molecules": [
+        "Thrombin",
+        "Fibrinogen"
+      ]
+    }
+  },
+  {
+    "node_type": "pathway",
+    "name": "Serotonin Pathway",
+    "description": "The Serotonin Pathway is involved in mood regulation and is a key target for antidepressants like SSRIs. It impacts various physiological functions.",
+    "properties": {
+      "biological_system": "Nervous system",
+      "key_molecules": [
+        "Serotonin",
+        "SERT"
+      ]
+    }
+  },
+  {
+    "node_type": "pathway",
+    "name": "Inflammatory Response Pathway",
+    "description": "The Inflammatory Response Pathway is a biological process that involves the immune system's response to injury or infection. It is targeted by anti-inflammatory drugs.",
+    "properties": {
+      "biological_system": "Immune system",
+      "key_molecules": [
+        "Cytokines",
+        "Prostaglandins"
+      ]
+    }
+  },
+  {
+    "node_type": "pathway",
+    "name": "Insulin Signaling Pathway",
+    "description": "The Insulin Signaling Pathway regulates glucose homeostasis and is crucial in diabetes management. It involves insulin receptor signaling and downstream effects.",
+    "properties": {
+      "biological_system": "Endocrine system",
+      "key_molecules": [
+        "Insulin",
+        "PI3K"
+      ]
+    }
+  },
+  {
+    "node_type": "pathway",
+    "name": "Thyroid Hormone Pathway",
+    "description": "The Thyroid Hormone Pathway regulates metabolism, growth, and development. It is vital for maintaining energy balance in the body.",
+    "properties": {
+      "biological_system": "Endocrine system",
+      "key_molecules": [
+        "Thyroid Hormones",
+        "TRH"
+      ]
+    }
+  },
+  {
+    "node_type": "pathway",
+    "name": "Cholesterol Metabolism Pathway",
+    "description": "The Cholesterol Metabolism Pathway is critical for lipid homeostasis and is targeted by statins for cholesterol-lowering therapies.",
+    "properties": {
+      "biological_system": "Metabolic system",
+      "key_molecules": [
+        "Cholesterol",
+        "HMG-CoA"
+      ]
+    }
+  },
+  {
+    "node_type": "pathway",
+    "name": "Pain Signaling Pathway",
+    "description": "The Pain Signaling Pathway involves the transmission of pain signals and their modulation. It is a target for analgesic medications.",
+    "properties": {
+      "biological_system": "Nervous system",
+      "key_molecules": [
+        "Substance P",
+        "CGRP"
+      ]
+    }
+  }
+]
