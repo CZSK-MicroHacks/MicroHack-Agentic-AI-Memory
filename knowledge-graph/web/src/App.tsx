@@ -1,4 +1,5 @@
 import { useState, useCallback, useEffect, useRef } from "react";
+import Markdown from "react-markdown";
 
 interface Question {
   id: number;
@@ -83,8 +84,12 @@ function Panel({
         )}
         {/* Answer */}
         {state.answer && (
-          <div className="text-sm text-gray-300 leading-relaxed whitespace-pre-wrap animate-fade-in">
-            {state.answer}
+          <div className="prose prose-sm prose-invert max-w-none animate-fade-in
+                          prose-headings:text-gray-200 prose-headings:font-semibold prose-headings:mt-3 prose-headings:mb-1
+                          prose-p:text-gray-300 prose-p:leading-relaxed prose-p:my-1
+                          prose-li:text-gray-300 prose-strong:text-gray-100
+                          prose-ul:my-1 prose-ol:my-1">
+            <Markdown>{state.answer}</Markdown>
           </div>
         )}
         <div ref={endRef} />
