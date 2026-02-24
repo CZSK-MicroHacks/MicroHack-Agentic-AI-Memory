@@ -1,64 +1,93 @@
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 
 interface Question {
   id: number;
   question: string;
-  expected: string;
 }
 
-interface CompareResult {
-  question: string;
-  expected: string;
-  rag_answer: string;
-  rag_tools: string[];
-  graph_answer: string;
-  graph_tools: string[];
+interface ToolCall {
+  tool: string;
+  summary?: string;
 }
 
-function ToolTrace({ tools, color }: { tools: string[]; color: string }) {
-  if (!tools.length) return null;
+interface PanelState {
+  status: "idle" | "running" | "done";
+  tools: ToolCall[];
+  answer: string;
+}
+
+const EMPTY_PANEL: PanelState = { status: "idle", tools: [], answer: "" };
+
+function ToolLine({ tc }: { tc: ToolCall }) {
   return (
-    <div className={`mb-3 rounded-lg border p-3 ${color}`}>
-      <div className="mb-1 text-xs font-semibold uppercase tracking-wide opacity-70">
-        Tool Calls ({tools.length})
+    <div className="flex items-start gap-2 py-1 text-sm font-mono animate-fade-in">
+      <span className="text-emerald-400 shrink-0 mt-0.5">$</span>
+      <div>
+        <span className="text-gray-200">{tc.tool}</span>
+        {tc.summary && (
+          <span className="text-gray-500 ml-2">{tc.summary}</span>
+        )}
       </div>
-      {tools.map((t, i) => (
-        <div key={i} className="flex items-start gap-1.5 text-sm font-mono leading-relaxed">
-          <span className="shrink-0 mt-0.5">&#x2022;</span>
-          <span className="break-all">{t}</span>
-        </div>
-      ))}
     </div>
   );
 }
 
-function AnswerPanel({
+function Panel({
   title,
-  icon,
-  answer,
-  tools,
-  traceColor,
-  borderColor,
+  subtitle,
+  state,
+  accent,
 }: {
   title: string;
-  icon: string;
-  answer: string;
-  tools: string[];
-  traceColor: string;
-  borderColor: string;
+  subtitle: string;
+  state: PanelState;
+  accent: string;
 }) {
+  const endRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    endRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  }, [state.tools.length, state.answer]);
+
   return (
-    <div className={`flex-1 min-w-0 rounded-xl border-2 ${borderColor} bg-white shadow-sm`}>
-      <div className={`px-4 py-3 border-b ${borderColor} bg-gray-50 rounded-t-xl`}>
-        <h3 className="text-lg font-semibold flex items-center gap-2">
-          <span>{icon}</span> {title}
-        </h3>
-      </div>
-      <div className="p-4 space-y-3">
-        <ToolTrace tools={tools} color={traceColor} />
-        <div className="prose prose-sm max-w-none whitespace-pre-wrap text-gray-800 leading-relaxed">
-          {answer}
+    <div className={`flex-1 min-w-0 flex flex-col rounded-lg border ${accent} bg-gray-900/60`}>
+      <div className={`px-4 py-2.5 border-b ${accent} bg-gray-900/80 rounded-t-lg flex items-center justify-between`}>
+        <div>
+          <h3 className="text-sm font-semibold text-gray-100">{title}</h3>
+          <p className="text-xs text-gray-500">{subtitle}</p>
         </div>
+        {state.status === "running" && (
+          <div className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
+        )}
+        {state.status === "done" && (
+          <span className="text-xs text-gray-500">Done</span>
+        )}
+      </div>
+      <div className="flex-1 p-4 overflow-y-auto max-h-[60vh] space-y-3">
+        {/* Tool calls */}
+        {state.tools.length > 0 && (
+          <div className="rounded border border-gray-700 bg-gray-950/50 px-3 py-2">
+            <div className="text-[10px] font-semibold uppercase tracking-widest text-gray-600 mb-1">
+              Tool Calls
+            </div>
+            {state.tools.map((tc, i) => (
+              <ToolLine key={i} tc={tc} />
+            ))}
+          </div>
+        )}
+        {/* Running indicator before answer */}
+        {state.status === "running" && state.tools.length > 0 && !state.answer && (
+          <div className="flex items-center gap-2 text-xs text-gray-500 py-1">
+            <div className="h-3 w-3 animate-spin rounded-full border-2 border-gray-700 border-t-emerald-400" />
+            Reasoning...
+          </div>
+        )}
+        {/* Answer */}
+        {state.answer && (
+          <div className="text-sm text-gray-300 leading-relaxed whitespace-pre-wrap animate-fade-in">
+            {state.answer}
+          </div>
+        )}
+        <div ref={endRef} />
       </div>
     </div>
   );
@@ -67,137 +96,151 @@ function AnswerPanel({
 export default function App() {
   const [questions, setQuestions] = useState<Question[]>([]);
   const [selected, setSelected] = useState<number | null>(null);
-  const [result, setResult] = useState<CompareResult | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [rag, setRag] = useState<PanelState>(EMPTY_PANEL);
+  const [graph, setGraph] = useState<PanelState>(EMPTY_PANEL);
+  const [running, setRunning] = useState(false);
+  const abortRef = useRef<AbortController | null>(null);
 
-  // Load questions on mount
   useEffect(() => {
     fetch("/api/questions")
       .then((r) => r.json())
       .then(setQuestions)
-      .catch(() => setError("Failed to load questions. Is the API server running?"));
+      .catch(() => {});
   }, []);
 
-  const runComparison = useCallback(
-    async (id: number) => {
-      setSelected(id);
-      setResult(null);
-      setError(null);
-      setLoading(true);
-      try {
-        const resp = await fetch(`/api/compare/${id}`, { method: "POST" });
-        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-        const data: CompareResult = await resp.json();
-        setResult(data);
-      } catch (e: unknown) {
-        setError(e instanceof Error ? e.message : "Request failed");
-      } finally {
-        setLoading(false);
-      }
-    },
-    []
-  );
+  const runComparison = useCallback((id: number) => {
+    // Abort any in-flight request
+    abortRef.current?.abort();
+    const controller = new AbortController();
+    abortRef.current = controller;
+
+    setSelected(id);
+    setRag(EMPTY_PANEL);
+    setGraph(EMPTY_PANEL);
+    setRunning(true);
+
+    const evtSource = new EventSource(`/api/compare/${id}`);
+
+    evtSource.addEventListener("rag_start", () => {
+      setRag((p) => ({ ...p, status: "running" }));
+    });
+    evtSource.addEventListener("rag_tool", (e) => {
+      const d = JSON.parse(e.data);
+      setRag((p) => ({ ...p, tools: [...p.tools, { tool: d.tool }] }));
+    });
+    evtSource.addEventListener("rag_answer", (e) => {
+      const d = JSON.parse(e.data);
+      setRag((p) => ({ ...p, status: "done", answer: d.answer }));
+    });
+    evtSource.addEventListener("graph_start", () => {
+      setGraph((p) => ({ ...p, status: "running" }));
+    });
+    evtSource.addEventListener("graph_tool", (e) => {
+      const d = JSON.parse(e.data);
+      setGraph((p) => ({
+        ...p,
+        tools: [...p.tools, { tool: d.tool, summary: d.summary }],
+      }));
+    });
+    evtSource.addEventListener("graph_answer", (e) => {
+      const d = JSON.parse(e.data);
+      setGraph((p) => ({ ...p, status: "done", answer: d.answer }));
+    });
+    evtSource.addEventListener("done", () => {
+      setRunning(false);
+      evtSource.close();
+    });
+    evtSource.onerror = () => {
+      setRunning(false);
+      evtSource.close();
+    };
+
+    // Cleanup on abort
+    controller.signal.addEventListener("abort", () => {
+      evtSource.close();
+      setRunning(false);
+    });
+  }, []);
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50">
+    <div className="min-h-screen bg-gray-950 text-gray-100 flex flex-col">
       {/* Header */}
-      <header className="bg-white border-b shadow-sm">
-        <div className="max-w-7xl mx-auto px-6 py-4">
-          <h1 className="text-2xl font-bold text-gray-900">
-            Knowledge Graph Comparison Demo
-          </h1>
-          <p className="text-sm text-gray-500 mt-1">
-            RAG-only (hybrid search) vs Agentic Graph Search &mdash; Biomedical Drug Interactions
-          </p>
+      <header className="border-b border-gray-800 bg-gray-900/80 backdrop-blur-sm">
+        <div className="max-w-screen-2xl mx-auto px-6 py-3 flex items-center justify-between">
+          <div>
+            <h1 className="text-lg font-bold tracking-tight">
+              Knowledge Graph Comparison
+            </h1>
+            <p className="text-xs text-gray-500">
+              RAG-only vs Agentic Graph Search
+            </p>
+          </div>
+          <span className="text-[10px] uppercase tracking-widest text-gray-600 border border-gray-800 rounded px-2 py-0.5">
+            Biomedical
+          </span>
         </div>
       </header>
 
-      <main className="max-w-7xl mx-auto px-6 py-6 space-y-6">
-        {/* Question selector */}
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+      <div className="flex-1 flex flex-col max-w-screen-2xl mx-auto w-full px-6 py-4 gap-4">
+        {/* Question bar */}
+        <div className="flex flex-wrap gap-2">
           {questions.map((q) => (
             <button
               key={q.id}
               onClick={() => runComparison(q.id)}
-              disabled={loading}
-              className={`text-left p-4 rounded-xl border-2 transition-all duration-200
+              disabled={running}
+              className={`px-3 py-1.5 rounded text-xs transition-all
                 ${
                   selected === q.id
-                    ? "border-blue-500 bg-blue-50 shadow-md"
-                    : "border-gray-200 bg-white hover:border-blue-300 hover:shadow"
+                    ? "bg-blue-600 text-white shadow-lg shadow-blue-600/20"
+                    : "bg-gray-800 text-gray-400 hover:bg-gray-700 hover:text-gray-200"
                 }
-                ${loading ? "opacity-60 cursor-wait" : "cursor-pointer"}
+                ${running ? "opacity-50 cursor-wait" : "cursor-pointer"}
               `}
+              title={q.question}
             >
-              <div className="text-xs font-semibold text-blue-600 mb-1">Q{q.id}</div>
-              <div className="text-sm font-medium text-gray-800">{q.question}</div>
-              <div className="text-xs text-gray-400 mt-2">
-                Expected: {q.expected}
-              </div>
+              <span className="font-semibold mr-1.5">Q{q.id}</span>
+              <span className="hidden sm:inline">
+                {q.question.length > 60
+                  ? q.question.slice(0, 57) + "..."
+                  : q.question}
+              </span>
+              <span className="sm:hidden">
+                {q.question.split(".")[0].split("?")[0].slice(0, 30)}...
+              </span>
             </button>
           ))}
         </div>
 
-        {/* Loading */}
-        {loading && (
-          <div className="flex items-center justify-center py-16">
-            <div className="flex flex-col items-center gap-3">
-              <div className="h-10 w-10 animate-spin rounded-full border-4 border-blue-200 border-t-blue-600" />
-              <span className="text-sm text-gray-500">
-                Running comparison&hellip; Agent is reasoning and calling tools.
-              </span>
-            </div>
+        {/* Selected question full text */}
+        {selected && (
+          <div className="text-sm text-gray-400 bg-gray-900/40 border border-gray-800 rounded px-4 py-2">
+            {questions.find((q) => q.id === selected)?.question}
           </div>
         )}
 
-        {/* Error */}
-        {error && (
-          <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-red-700 text-sm">
-            {error}
+        {/* Two-column comparison */}
+        {selected ? (
+          <div className="flex-1 flex flex-col lg:flex-row gap-4 min-h-0">
+            <Panel
+              title="RAG-only"
+              subtitle="Hybrid search, then LLM"
+              state={rag}
+              accent="border-gray-700"
+            />
+            <Panel
+              title="Agentic Graph"
+              subtitle="LLM decides which tools to call"
+              state={graph}
+              accent="border-blue-800"
+            />
+          </div>
+        ) : (
+          <div className="flex-1 flex items-center justify-center text-gray-600 text-sm">
+            Select a question to run the comparison
           </div>
         )}
-
-        {/* Results */}
-        {result && !loading && (
-          <div className="space-y-4">
-            <div className="rounded-xl bg-amber-50 border border-amber-200 px-4 py-3">
-              <span className="font-semibold text-amber-800">Question:</span>{" "}
-              <span className="text-amber-900">{result.question}</span>
-              <div className="text-xs text-amber-600 mt-1">
-                Expected: {result.expected}
-              </div>
-            </div>
-
-            <div className="flex flex-col lg:flex-row gap-4">
-              <AnswerPanel
-                title="RAG-only"
-                icon="&#x1F4C4;"
-                answer={result.rag_answer}
-                tools={result.rag_tools}
-                traceColor="bg-gray-50 border-gray-200"
-                borderColor="border-gray-300"
-              />
-              <AnswerPanel
-                title="Agentic Graph"
-                icon="&#x1F517;"
-                answer={result.graph_answer}
-                tools={result.graph_tools}
-                traceColor="bg-blue-50 border-blue-200"
-                borderColor="border-blue-400"
-              />
-            </div>
-          </div>
-        )}
-
-        {/* Empty state */}
-        {!loading && !result && !error && questions.length > 0 && (
-          <div className="text-center py-16 text-gray-400">
-            <div className="text-4xl mb-3">&#x1F50D;</div>
-            <p>Select a question above to run the comparison.</p>
-          </div>
-        )}
-      </main>
+      </div>
     </div>
   );
 }

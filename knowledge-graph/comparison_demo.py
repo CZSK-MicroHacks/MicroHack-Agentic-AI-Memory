@@ -26,26 +26,11 @@ logging.basicConfig(level=logging.WARNING)
 
 
 QUESTIONS = [
-    {
-        "question": "A patient on Warfarin has a headache. What pain medications should they avoid?",
-        "expected": "Should list Aspirin, Ibuprofen, Clopidogrel as specific drugs that interact with Warfarin.",
-    },
-    {
-        "question": "What do Metformin and Lisinopril have in common?",
-        "expected": "Should find shared neighbors (e.g. Gabapentin) and shared community/pathway memberships.",
-    },
-    {
-        "question": "What is the landscape of cardiovascular treatments?",
-        "expected": "Should expand cardiovascular concept to list all member drugs, diseases, and pathways.",
-    },
-    {
-        "question": "Could diabetes medication affect bleeding risk?",
-        "expected": "Should trace multi-hop path: diabetes drugs → side effects/interactions → bleeding-related drugs.",
-    },
-    {
-        "question": "Which drugs are most likely to have dangerous interactions?",
-        "expected": "Should rank drugs by INTERACTS_WITH edge count, identifying Warfarin and Aspirin as top.",
-    },
+    {"question": "A patient on Warfarin has a headache. What pain medications should they avoid?"},
+    {"question": "What do Metformin and Lisinopril have in common?"},
+    {"question": "What is the landscape of cardiovascular treatments?"},
+    {"question": "Could diabetes medication affect bleeding risk?"},
+    {"question": "Which drugs are most likely to have dangerous interactions?"},
 ]
 
 
@@ -111,7 +96,6 @@ async def main():
         print()
         print("─" * 80)
         print(f"  Q{i}: {q['question']}")
-        print(f"  🎯 Expected: {q['expected']}")
         print("─" * 80)
 
         # ── RAG-only ──
