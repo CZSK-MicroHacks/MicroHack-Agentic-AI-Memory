@@ -20,7 +20,7 @@ PostgreSQL (single container)
                           ▼
              ┌─────────────────────────────────────┐
              │      AGE "biomedical" graph          │
-             │  66 vertices, 196 edges              │
+             │  66 vertices, 234 edges              │
              │  Cypher queries for traversal        │
              └─────────────────────────────────────┘
 ```
@@ -44,7 +44,7 @@ PostgreSQL (single container)
 | `pathway` | 8     | Coagulation Cascade, Serotonin Pathway, Insulin Signaling |
 | `concept` | 9     | Cardiovascular Treatments, Diabetes Management, Drug Interaction Risk Factors |
 
-### Relationship Types (~141 edges + 55 community memberships)
+### Relationship Types (~179 edges + 55 community memberships = 234 total)
 
 | Relationship | Direction | Example |
 |---|---|---|
@@ -96,18 +96,50 @@ Concepts are GraphRAG-style community summaries — LLM-generated descriptions o
 | "Cardiovascular treatment overview" | Returns top-5 similar docs | Expands concept node → all 6+ members with internal relationships |
 | "Link between diabetes meds and bleeding?" | Finds diabetes and bleeding docs | Multi-hop: Metformin → genes → pathways → coagulation → Warfarin → Bleeding |
 
-## Agent Tools
+## Truly Agentic Architecture
 
-The `src/tools.py` module provides these async functions, ready to be wrapped as agent-callable tools:
+The agent (`agent.py`) uses **OpenAI function-calling** — the LLM autonomously decides which tools to invoke and in what order. There is no hardcoded pipeline; the agent reasons about the question and picks the right sequence of tool calls.
+
+### Agent Tools (Function-Calling Schema)
 
 | Tool | Description | Search Strategy |
 |------|-------------|-----------------|
 | `search_entities(query, node_type?, limit?)` | Hybrid search on entity nodes | DFS entry point |
 | `search_concepts(query, limit?)` | Hybrid search on concept/community nodes | BFS entry point |
 | `find_related(node_name, relationship_type?, depth?)` | Graph traversal from a node | DFS |
-| `tool_expand_concept(concept_name)` | Get all community members + internal relationships | BFS |
-| `tool_find_shared_connections(node1, node2)` | Find common neighbors and communities | Cross-reference |
-| `tool_find_similar_by_graph(node_name, strategy?, limit?)` | Find structurally similar nodes | Graph analysis |
+| `expand_concept(concept_name)` | Get all community members + internal relationships | BFS |
+| `find_shared_connections(node1, node2)` | Find common neighbors and communities | Cross-reference |
+| `find_similar_by_graph(node_name, strategy?, limit?)` | Find structurally similar nodes | Graph analysis |
+
+### How the Agent Decides
+
+The LLM receives tool schemas and a system prompt. For each question it:
+1. Decides which tool(s) to call (may call multiple in sequence)
+2. Receives tool results as assistant messages
+3. Decides whether to call more tools or generate a final answer
+4. Repeats up to 8 iterations (configurable)
+
+**Example: "A patient on Warfarin has a headache — safe pain meds?"**
+```
+🔧 find_related(node_name='Warfarin', relationship_type='INTERACTS_WITH')
+   → 7 results: Amoxicillin, Aspirin, Clopidogrel, Ibuprofen, ...
+🤖 "Patients on Warfarin should avoid Aspirin and Ibuprofen..."
+```
+
+**Example: "What is the cardiovascular treatment landscape?"**
+```
+🔧 search_concepts(query='Cardiovascular Treatments')
+   → 3 results: Cardiovascular Disease Management, Anticoagulation Therapy, ...
+🔧 expand_concept(concept_name='Cardiovascular Disease Management')
+   → 6 members: Heart Failure, Hypertension, Atorvastatin, Lisinopril, ...
+🔧 expand_concept(concept_name='Anticoagulation Therapy')
+   → 6 members: Warfarin, Clopidogrel, Atrial Fibrillation, ...
+🔧 expand_concept(concept_name='Shared Metabolic Pathways')
+   → 7 members: Atorvastatin, Insulin, Metformin, AMPK, ...
+🤖 Comprehensive answer covering all 3 communities with internal relationships
+```
+
+The agent's tool call trace is displayed in both the interactive agent and the comparison demo.
 
 ## Quick Start
 
@@ -143,10 +175,9 @@ uv sync
 ```bash
 cd scripts
 
-# Generate entities, relationships, and concepts using LLM
+# Generate entities, relationships (with enrichment), and concepts using LLM
 uv run python generate_entities.py
-uv run python generate_relationships.py
-uv run python supplement_relationships.py
+uv run python generate_relationships.py   # Phase 1: initial + Phase 2: enrichment batches
 uv run python generate_concepts.py
 
 # Load into PostgreSQL (computes embeddings + populates AGE graph)
@@ -169,7 +200,7 @@ Expected: 31 tests passing across search, graph, tools, and comparison test file
 uv run python comparison_demo.py
 ```
 
-Shows side-by-side RAG-only vs graph-enhanced results for 5 curated questions.
+Shows 5 curated questions answered by RAG-only (single hybrid search) vs the agentic graph agent (LLM-driven multi-tool exploration). Each question includes tool call traces showing how the agent autonomously decided what to search and traverse.
 
 ### 7. Run the Interactive Agent
 
@@ -177,7 +208,19 @@ Shows side-by-side RAG-only vs graph-enhanced results for 5 curated questions.
 uv run python agent.py
 ```
 
-Type questions or `examples` to see sample queries. The agent uses hybrid search + graph traversal + LLM to generate comprehensive answers.
+Type questions or `examples` to see sample queries. The agent uses **OpenAI function-calling** to autonomously decide which tools to invoke — it discovers relationships, expands communities, and finds shared connections without being told which edges to follow.
+
+### 8. Run the Graphical Comparison Demo (Web UI)
+
+```bash
+# Build the frontend (one-time)
+cd web && npm install && npm run build && cd ..
+
+# Start the API server (serves both API and frontend)
+uv run python api_server.py
+```
+
+Open http://localhost:8080 in your browser. Select any of the 5 curated questions to see a side-by-side comparison of RAG-only vs agentic graph search, complete with tool call traces.
 
 ## File Structure
 
@@ -194,8 +237,7 @@ knowledge-graph/
 ├── scripts/
 │   ├── helpers.py              # Shared: OpenAI client, embeddings, JSON I/O
 │   ├── generate_entities.py    # LLM generates 57 biomedical entities
-│   ├── generate_relationships.py   # LLM generates initial relationships
-│   ├── supplement_relationships.py # Adds more edges in targeted batches
+│   ├── generate_relationships.py   # LLM generates relationships (Phase 1 + Phase 2 enrichment)
 │   ├── generate_concepts.py    # LLM generates 9 community/concept nodes
 │   ├── load_nodes.py           # Compute embeddings, insert into nodes table
 │   └── load_graph.py           # Create AGE vertices + edges + community links
@@ -210,8 +252,10 @@ knowledge-graph/
 │   ├── test_tools.py           # 10 tests: all tool functions
 │   └── test_comparison.py      # 6 tests: graph search beats RAG
 ├── data/                       # Generated JSON (entities, relationships, concepts)
-├── agent.py                    # Interactive CLI agent
-├── comparison_demo.py          # Side-by-side RAG vs Graph demo
+├── agent.py                    # Truly agentic CLI (OpenAI function-calling loop)
+├── comparison_demo.py          # RAG-only vs agentic graph side-by-side demo (CLI)
+├── api_server.py               # FastAPI backend for graphical comparison demo
+├── web/                        # React + Tailwind frontend for graphical demo
 └── README.md                   # This file
 ```
 

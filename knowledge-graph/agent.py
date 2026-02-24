@@ -1,6 +1,10 @@
 """
 Interactive CLI demo agent for the biomedical knowledge graph.
 
+The agent is **truly agentic**: the LLM sees tool descriptions, decides
+which tools to call, we execute them and return results, the LLM reasons
+and either calls more tools or gives a final answer.  No hardcoded pipeline.
+
 Usage:
     cd knowledge-graph
     uv run python agent.py
@@ -20,6 +24,10 @@ sys.path.insert(0, os.path.dirname(__file__))
 from dotenv import load_dotenv
 
 load_dotenv()
+
+# Suppress noisy library loggers — only errors
+for _name in ("azure", "httpx", "asyncpg", "httpcore", "urllib3", "msal"):
+    logging.getLogger(_name).setLevel(logging.ERROR)
 logging.basicConfig(level=logging.WARNING)
 
 from src.tools import (
@@ -33,115 +41,244 @@ from src.tools import (
 )
 from src.db import close_pool
 
+# ── Tool definitions for OpenAI function-calling ─────────────────────
+
+TOOLS_SCHEMA = [
+    {
+        "type": "function",
+        "function": {
+            "name": "search_entities",
+            "description": "Hybrid semantic+keyword search on entity nodes (drugs, diseases, genes, symptoms, pathways). Use as the starting point for depth-first graph exploration.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "query": {"type": "string", "description": "Natural-language search query"},
+                    "node_type": {"type": "string", "enum": ["drug", "disease", "gene", "symptom", "pathway"], "description": "Optional filter by entity type"},
+                    "limit": {"type": "integer", "description": "Max results (default 5)"},
+                },
+                "required": ["query"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "search_concepts",
+            "description": "Hybrid search on concept/community nodes (therapeutic areas like 'Cardiovascular Treatments', 'Diabetes Management'). Use as the starting point for breadth-first exploration of an entire therapeutic landscape.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "query": {"type": "string", "description": "Natural-language search query"},
+                    "limit": {"type": "integer", "description": "Max results (default 3)"},
+                },
+                "required": ["query"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "find_related",
+            "description": "Graph traversal: follow edges from a named node to discover connected entities. Supports filtering by relationship type and multi-hop depth.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "node_name": {"type": "string", "description": "Exact name of the starting node"},
+                    "relationship_type": {
+                        "type": "string",
+                        "enum": ["TREATS", "CAUSES_SIDE_EFFECT", "TARGETS_GENE", "INTERACTS_WITH", "ASSOCIATED_WITH", "PRESENTS_AS", "INVOLVES_PATHWAY", "PART_OF_PATHWAY", "CONTRAINDICATED", "BELONGS_TO_COMMUNITY"],
+                        "description": "Optional: only follow this edge type",
+                    },
+                    "depth": {"type": "integer", "description": "Hop count: 1=direct neighbors (default), 2=two hops for indirect connections"},
+                },
+                "required": ["node_name"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "expand_concept",
+            "description": "BFS expansion: get all member entities and internal relationships of a concept/community node. Returns the community description, member list, and connections between members.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "concept_name": {"type": "string", "description": "Exact name of the concept node"},
+                },
+                "required": ["concept_name"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "find_shared_connections",
+            "description": "Find what two entities have in common: shared neighbors (entities connected to both) and shared community memberships. Reveals non-obvious relationships.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "node_name_1": {"type": "string", "description": "First entity name"},
+                    "node_name_2": {"type": "string", "description": "Second entity name"},
+                },
+                "required": ["node_name_1", "node_name_2"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "find_similar_by_graph",
+            "description": "Find entities that are structurally most similar to a given node in the graph — by shared neighbors or shared community memberships.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "node_name": {"type": "string", "description": "Entity name to compare against"},
+                    "strategy": {"type": "string", "enum": ["shared_neighbors", "shared_communities"], "description": "Similarity strategy (default: shared_neighbors)"},
+                    "limit": {"type": "integer", "description": "Max results (default 5)"},
+                },
+                "required": ["node_name"],
+            },
+        },
+    },
+]
+
 SYSTEM_PROMPT = """\
 You are a biomedical knowledge assistant with access to a knowledge graph containing
 drugs, diseases, genes, symptoms, biological pathways, and higher-level therapeutic concepts.
 
-You have these tools available (already executed — the results are provided below):
-- search_entities: hybrid semantic+keyword search on entity nodes
-- search_concepts: hybrid search on community/concept nodes
-- find_related: graph traversal to find connected nodes (DFS)
-- expand_concept: BFS expansion of a concept community
-- find_shared_connections: find common neighbors between two nodes
-- find_similar_by_graph: find structurally similar nodes
+You have tools to search the knowledge graph and traverse its structure.
+Think step-by-step:
+1. Start by searching for relevant entities or concepts.
+2. Use graph traversal to explore connections (neighbors, paths, shared links).
+3. Call additional tools if your first results suggest follow-up exploration.
+4. Synthesize findings into a clear, cited answer.
 
-Use the tool results to give a comprehensive, accurate answer.
-Always cite which relationships or connections support your answer.
+Always cite which specific relationships or graph connections support your answer.
+Be thorough — use multiple tool calls when the question requires understanding
+relationships between entities.
 """
 
+# ── Tool dispatch ────────────────────────────────────────────────────
 
-async def answer_question(question: str) -> str:
-    """Use tools to gather context, then generate an LLM answer."""
-    # Step 1: Search for relevant entities and concepts
-    entities = await search_entities(question, limit=3)
-    concepts = await search_concepts(question, limit=2)
+TOOL_DISPATCH = {
+    "search_entities": search_entities,
+    "search_concepts": search_concepts,
+    "find_related": find_related,
+    "expand_concept": tool_expand_concept,
+    "find_shared_connections": tool_find_shared_connections,
+    "find_similar_by_graph": tool_find_similar_by_graph,
+}
 
-    # Step 2: Graph traversal from top entity results
-    graph_context = []
-    for entity in entities[:2]:
-        neighbors = await find_related(entity["name"])
-        graph_context.append({
-            "node": entity["name"],
-            "type": entity["node_type"],
-            "connections": [
-                {"name": n["name"], "via": n["relationship_type"]}
-                for n in neighbors[:10]
-            ],
-        })
 
-    # Step 3: Expand top concept
-    concept_detail = None
-    if concepts:
-        concept_detail = await tool_expand_concept(concepts[0]["name"])
+def _fmt_args(args: dict) -> str:
+    """Compact formatting of tool arguments for display."""
+    parts = []
+    for k, v in args.items():
+        if isinstance(v, str) and len(v) > 40:
+            v = v[:37] + "..."
+        parts.append(f"{k}={v!r}")
+    return ", ".join(parts)
 
-    # Step 4: If 2+ entities, find shared connections
-    shared = None
-    if len(entities) >= 2:
-        shared = await tool_find_shared_connections(entities[0]["name"], entities[1]["name"])
 
-    # Build context for LLM
-    context_parts = []
-    context_parts.append("## Entity Search Results")
-    for e in entities:
-        context_parts.append(f"- [{e['node_type']}] {e['name']}: {e['description']}")
+def _fmt_result_summary(name: str, result) -> str:
+    """One-line summary of a tool result for display."""
+    if isinstance(result, list):
+        if not result:
+            return "→ (empty)"
+        names = [r.get("name", "?") for r in result[:5] if isinstance(r, dict)]
+        suffix = f" +{len(result)-5} more" if len(result) > 5 else ""
+        return f"→ {len(result)} results: {', '.join(names)}{suffix}"
+    if isinstance(result, dict):
+        if "error" in result:
+            return f"→ error: {result['error']}"
+        if "members" in result:
+            members = [m.get("name", "?") for m in result["members"][:4]]
+            return f"→ {len(result['members'])} members: {', '.join(members)}..."
+        if "shared_neighbors" in result:
+            n = len(result["shared_neighbors"])
+            c = len(result.get("shared_communities", []))
+            return f"→ {n} shared neighbors, {c} shared communities"
+        return f"→ {json.dumps(result, default=str)[:80]}..."
+    return f"→ {str(result)[:80]}"
 
-    context_parts.append("\n## Concept Search Results")
-    for c in concepts:
-        context_parts.append(f"- {c['name']}: {c['description'][:200]}")
 
-    context_parts.append("\n## Graph Traversal (connections)")
-    for g in graph_context:
-        context_parts.append(f"\n### {g['node']} ({g['type']})")
-        for conn in g["connections"]:
-            context_parts.append(f"  → {conn['name']} (via {conn['via']})")
+async def run_agent(question: str, *, show_trace: bool = True) -> tuple[str, list[dict]]:
+    """
+    Run the agentic tool-calling loop. Returns (answer, tool_trace).
 
-    if concept_detail and "members" in concept_detail:
-        context_parts.append(f"\n## Concept Expansion: {concept_detail['concept']}")
-        context_parts.append(f"Description: {concept_detail.get('description', '')[:300]}")
-        members = [m["name"] for m in concept_detail.get("members", [])]
-        context_parts.append(f"Members: {', '.join(members)}")
-        for rel in concept_detail.get("internal_relationships", [])[:5]:
-            context_parts.append(f"  {rel['source']} --[{rel['relationship']}]--> {rel['target']}")
-
-    if shared:
-        context_parts.append(f"\n## Shared Connections: {shared['node_1']} ↔ {shared['node_2']}")
-        for s in shared.get("shared_neighbors", [])[:5]:
-            context_parts.append(
-                f"  Common: {s['shared_node']} "
-                f"({s['relationship_to_first']} / {s['relationship_to_second']})"
-            )
-        if shared.get("shared_communities"):
-            context_parts.append(f"  Shared communities: {', '.join(shared['shared_communities'])}")
-
-    context = "\n".join(context_parts)
-
-    # Step 5: LLM generates final answer
+    The LLM decides which tools to call at each step.
+    """
     client = _get_client()
     deployment = os.getenv("AZURE_OPENAI_DEPLOYMENT_NAME", "gpt-4o-mini")
-    resp = client.chat.completions.create(
-        model=deployment,
-        messages=[
-            {"role": "system", "content": SYSTEM_PROMPT},
-            {"role": "user", "content": f"Context from knowledge graph:\n\n{context}\n\nQuestion: {question}"},
-        ],
-        temperature=0.3,
-    )
-    return resp.choices[0].message.content
+    tool_trace: list[dict] = []
+
+    messages = [
+        {"role": "system", "content": SYSTEM_PROMPT},
+        {"role": "user", "content": question},
+    ]
+
+    for iteration in range(8):  # safety cap
+        resp = client.chat.completions.create(
+            model=deployment,
+            messages=messages,
+            tools=TOOLS_SCHEMA,
+            temperature=0.3,
+        )
+        choice = resp.choices[0]
+
+        # If the LLM wants to call tools
+        if choice.finish_reason == "tool_calls" and choice.message.tool_calls:
+            messages.append(choice.message)
+
+            for tc in choice.message.tool_calls:
+                fn_name = tc.function.name
+                fn_args = json.loads(tc.function.arguments)
+
+                # Execute
+                fn = TOOL_DISPATCH.get(fn_name)
+                if fn is None:
+                    result = {"error": f"Unknown tool: {fn_name}"}
+                else:
+                    try:
+                        result = await fn(**fn_args)
+                    except Exception as e:
+                        result = {"error": str(e)}
+
+                # Record trace
+                trace_entry = {"tool": fn_name, "args": fn_args, "summary": _fmt_result_summary(fn_name, result)}
+                tool_trace.append(trace_entry)
+
+                if show_trace:
+                    print(f"  🔧 {fn_name}({_fmt_args(fn_args)})")
+                    print(f"     {trace_entry['summary']}")
+
+                # Feed result back to LLM
+                messages.append({
+                    "role": "tool",
+                    "tool_call_id": tc.id,
+                    "content": json.dumps(result, default=str),
+                })
+        else:
+            # LLM is done — return the final answer
+            return choice.message.content or "(no answer)", tool_trace
+
+    return "(agent hit iteration limit)", tool_trace
 
 
 EXAMPLE_QUESTIONS = [
-    "A patient on Warfarin has a headache. What pain medications should they avoid?",
+    "A patient on Warfarin has a headache. What pain medications should they avoid and why?",
     "What do Metformin and Lisinopril have in common?",
     "Describe the landscape of cardiovascular treatments.",
-    "Could diabetes medication affect bleeding risk?",
+    "Could diabetes medication affect bleeding risk? Trace the path.",
     "What are the most important drug interactions to watch for?",
 ]
 
 
 async def main():
     print("\n╔══════════════════════════════════════════════════════════════╗")
-    print("║  Biomedical Knowledge Graph Agent                          ║")
-    print("║  Type a question, or 'examples' to see sample questions.   ║")
+    print("║  Biomedical Knowledge Graph Agent  (truly agentic)         ║")
+    print("║  The LLM decides which tools to call and when.             ║")
+    print("║  Type a question, or 'examples' for sample questions.      ║")
     print("║  Type 'quit' to exit.                                      ║")
     print("╚══════════════════════════════════════════════════════════════╝\n")
 
@@ -162,14 +299,14 @@ async def main():
             print()
             continue
 
-        # Check if user typed a number for example questions
         if question.isdigit() and 1 <= int(question) <= len(EXAMPLE_QUESTIONS):
             question = EXAMPLE_QUESTIONS[int(question) - 1]
             print(f"  → {question}")
 
-        print("\n🔍 Searching knowledge graph...\n")
+        print("\n  ── Agent reasoning ──")
         try:
-            answer = await answer_question(question)
+            answer, trace = await run_agent(question)
+            print(f"\n  ── Tool calls: {len(trace)} ──\n")
             print(f"🤖 Agent:\n{answer}\n")
         except Exception as e:
             print(f"❌ Error: {e}\n")

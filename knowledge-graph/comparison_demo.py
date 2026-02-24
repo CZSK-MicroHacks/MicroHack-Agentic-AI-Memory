@@ -1,195 +1,147 @@
 """
-Comparison demo: RAG-only (hybrid search) vs Graph-enhanced search.
+Comparison demo: RAG-only (hybrid search) vs Agentic Graph search.
 
-Shows side-by-side results for questions where graph traversal provides
-significantly better answers than plain semantic/keyword search alone.
+RAG-only: embed the question → hybrid search → feed top results to LLM.
+Agentic:  LLM decides which tools to call (search, traverse, expand, etc.).
+
+Shows side-by-side tool traces and answers for questions where graph wins.
 """
 
 import asyncio
 import json
-import logging
 import sys
 import os
+import logging
 
 sys.path.insert(0, os.path.dirname(__file__))
 
 from dotenv import load_dotenv
 
 load_dotenv()
-logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
-logger = logging.getLogger("kg.comparison")
+
+# Suppress all library noise — only errors
+for _name in ("azure", "httpx", "asyncpg", "httpcore", "urllib3", "msal"):
+    logging.getLogger(_name).setLevel(logging.ERROR)
+logging.basicConfig(level=logging.WARNING)
 
 
-# Test questions designed to show graph advantage
 QUESTIONS = [
     {
         "question": "A patient on Warfarin has a headache. What pain medications should they avoid?",
-        "why_graph_wins": "Requires: find Warfarin → interacts_with → drugs, then check which treat pain",
-        "expected_graph_finds": ["Aspirin", "Ibuprofen"],
+        "expected": "Should list Aspirin, Ibuprofen, Clopidogrel as specific drugs that interact with Warfarin.",
     },
     {
         "question": "What do Metformin and Lisinopril have in common?",
-        "why_graph_wins": "Requires: shared neighbors, shared pathways, shared communities",
-        "expected_graph_finds": ["shared connections", "communities"],
+        "expected": "Should find shared neighbors (e.g. Gabapentin) and shared community/pathway memberships.",
     },
     {
         "question": "What is the landscape of cardiovascular treatments?",
-        "why_graph_wins": "Requires: concept-level summary + BFS to all connected entities",
-        "expected_graph_finds": ["Cardiovascular", "members", "relationships"],
+        "expected": "Should expand cardiovascular concept to list all member drugs, diseases, and pathways.",
     },
     {
         "question": "Could diabetes medication affect bleeding risk?",
-        "why_graph_wins": "Requires multi-hop: Metformin → diabetes → genes → coagulation → Warfarin",
-        "expected_graph_finds": ["indirect path", "multi-hop"],
+        "expected": "Should trace multi-hop path: diabetes drugs → side effects/interactions → bleeding-related drugs.",
     },
     {
         "question": "Which drugs are most likely to have dangerous interactions?",
-        "why_graph_wins": "Requires: graph analysis of INTERACTS_WITH edge density",
-        "expected_graph_finds": ["most connected", "interaction count"],
+        "expected": "Should rank drugs by INTERACTS_WITH edge count, identifying Warfarin and Aspirin as top.",
     },
 ]
 
 
-async def rag_only_answer(question: str) -> dict:
-    """Answer using only hybrid search (no graph traversal)."""
-    from src.tools import _embed
+async def rag_only(question: str) -> tuple[str, list[str]]:
+    """RAG-only: hybrid search → top results → LLM answer."""
+    from src.tools import _embed, _get_client
     from src.search import hybrid_search
 
     embedding = _embed(question)
     results = await hybrid_search(question, embedding, limit=5)
 
-    return {
-        "method": "RAG-only (hybrid search)",
-        "results": [
-            {"name": r["name"], "type": r["node_type"], "description": r["description"][:100]}
-            for r in results
+    trace = [f"hybrid_search(query={question!r:.50}, limit=5) → {len(results)} results"]
+
+    context = "\n".join(
+        f"- [{r['node_type']}] {r['name']}: {r['description']}"
+        for r in results
+    )
+
+    client = _get_client()
+    deployment = os.getenv("AZURE_OPENAI_DEPLOYMENT_NAME", "gpt-4o-mini")
+    resp = client.chat.completions.create(
+        model=deployment,
+        messages=[
+            {"role": "system", "content": "You are a biomedical assistant. Answer based ONLY on the provided search results. If the results don't contain enough info, say so."},
+            {"role": "user", "content": f"Search results:\n{context}\n\nQuestion: {question}"},
         ],
-    }
+        temperature=0.3,
+    )
+    return resp.choices[0].message.content, trace
 
 
-async def graph_enhanced_answer(question: str) -> dict:
-    """Answer using hybrid search + graph traversal."""
-    from src.tools import _embed, search_entities, search_concepts, find_related
-    from src.graph import find_shared_connections, expand_community, find_similar_by_graph
-
-    # Step 1: Hybrid search for starting nodes
-    results = await search_entities(question, limit=3)
-    starting_nodes = [r["name"] for r in results]
-
-    # Step 2: Concept search for community context
-    concepts = await search_concepts(question, limit=2)
-
-    # Step 3: Graph traversal from each starting node
-    graph_findings = []
-    for node_name in starting_nodes:
-        neighbors = await find_related(node_name)
-        graph_findings.append({
-            "starting_node": node_name,
-            "direct_connections": [
-                {"name": n["name"], "via": n["relationship_type"]}
-                for n in neighbors[:8]
-            ],
-        })
-
-    # Step 4: If we have 2+ starting nodes, find shared connections
-    shared = None
-    if len(starting_nodes) >= 2:
-        shared = await find_shared_connections(starting_nodes[0], starting_nodes[1])
-
-    # Step 5: Expand relevant concepts
-    concept_details = []
-    for c in concepts[:1]:
-        detail = await expand_community(c["name"])
-        concept_details.append({
-            "concept": c["name"],
-            "description": detail.get("description", "")[:150],
-            "member_count": len(detail.get("members", [])),
-            "internal_relationships": len(detail.get("internal_relationships", [])),
-        })
-
-    # Step 6: Graph similarity
-    similar = []
-    if starting_nodes:
-        similar = await find_similar_by_graph(starting_nodes[0], strategy="shared_neighbors", limit=3)
-
-    return {
-        "method": "Graph-enhanced search",
-        "starting_nodes": results,
-        "graph_traversal": graph_findings,
-        "shared_connections": shared,
-        "concept_expansion": concept_details,
-        "graph_similar": similar,
-    }
+async def agentic_graph(question: str) -> tuple[str, list[str]]:
+    """Agentic: LLM decides tools via function calling."""
+    from agent import run_agent, _fmt_args
+    answer, tool_trace = await run_agent(question, show_trace=False)
+    trace = [
+        f"{t['tool']}({_fmt_args(t['args'])}) {t['summary']}"
+        for t in tool_trace
+    ]
+    return answer, trace
 
 
-def print_separator():
-    print("=" * 80)
-
-
-def print_rag_result(result: dict):
-    print(f"\n  📄 {result['method']}:")
-    for r in result["results"]:
-        print(f"     [{r['type']}] {r['name']}: {r['description']}...")
-
-
-def print_graph_result(result: dict):
-    print(f"\n  🔗 {result['method']}:")
-
-    print("     Starting nodes (from hybrid search):")
-    for r in result["starting_nodes"]:
-        print(f"       [{r['node_type']}] {r['name']}")
-
-    print("     Graph traversal findings:")
-    for finding in result["graph_traversal"]:
-        print(f"       From {finding['starting_node']}:")
-        for conn in finding["direct_connections"][:5]:
-            print(f"         → {conn['name']} (via {conn['via']})")
-
-    if result["shared_connections"]:
-        sc = result["shared_connections"]
-        print(f"     Shared connections between {sc['node_1']} and {sc['node_2']}:")
-        for s in sc["shared_neighbors"][:3]:
-            print(f"       Common: {s['shared_node']} ({s['relationship_to_first']} / {s['relationship_to_second']})")
-        if sc["shared_communities"]:
-            print(f"       Shared communities: {', '.join(sc['shared_communities'])}")
-
-    if result["concept_expansion"]:
-        for c in result["concept_expansion"]:
-            print(f"     Concept: {c['concept']} ({c['member_count']} members, {c['internal_relationships']} internal rels)")
-
-    if result["graph_similar"]:
-        print(f"     Most graph-similar to {result['starting_nodes'][0]['name'] if result['starting_nodes'] else '?'}:")
-        for s in result["graph_similar"]:
-            print(f"       {s['name']} (shared: {s['shared_count']})")
+def _wrap(text: str, width: int = 76, indent: str = "     ") -> str:
+    """Wrap long text for clean CLI output."""
+    import textwrap
+    return "\n".join(
+        textwrap.fill(line, width=width, initial_indent=indent, subsequent_indent=indent)
+        if line.strip() else ""
+        for line in text.split("\n")
+    )
 
 
 async def main():
     from src.db import close_pool
 
-    print("\n" + "=" * 80)
-    print("  COMPARISON: RAG-only vs Graph-enhanced Search")
+    print()
+    print("═" * 80)
+    print("  COMPARISON: RAG-only vs Agentic Graph Search")
     print("  Biomedical Drug Interactions Knowledge Graph")
-    print("=" * 80)
+    print("═" * 80)
 
     for i, q in enumerate(QUESTIONS, 1):
-        print_separator()
-        print(f"\n  Question {i}: {q['question']}")
-        print(f"  Why graph wins: {q['why_graph_wins']}")
-
-        # RAG-only
-        rag_result = await rag_only_answer(q["question"])
-        print_rag_result(rag_result)
-
-        # Graph-enhanced
-        graph_result = await graph_enhanced_answer(q["question"])
-        print_graph_result(graph_result)
-
         print()
+        print("─" * 80)
+        print(f"  Q{i}: {q['question']}")
+        print(f"  🎯 Expected: {q['expected']}")
+        print("─" * 80)
 
-    print_separator()
-    print("\n  ✅ Comparison complete!")
-    print("     Graph-enhanced search reveals connections, communities,")
-    print("     and multi-hop relationships that pure RAG misses.\n")
+        # ── RAG-only ──
+        rag_answer, rag_trace = await rag_only(q["question"])
+        print()
+        print("  📄 RAG-only (hybrid search → LLM)")
+        print("  Tool calls:")
+        for t in rag_trace:
+            print(f"     • {t}")
+        print("  Answer:")
+        print(_wrap(rag_answer))
+
+        # ── Agentic Graph ──
+        graph_answer, graph_trace = await agentic_graph(q["question"])
+        print()
+        print("  🔗 Agentic Graph (LLM decides tools)")
+        print(f"  Tool calls ({len(graph_trace)}):")
+        for t in graph_trace:
+            print(f"     • {t}")
+        print("  Answer:")
+        print(_wrap(graph_answer))
+
+    print()
+    print("═" * 80)
+    print("  ✅ Comparison complete!")
+    print("     RAG-only returns document snippets; the agent uses graph traversal to")
+    print("     discover relationships, shared connections, and multi-hop paths that")
+    print("     plain search cannot surface.")
+    print("═" * 80)
+    print()
 
     await close_pool()
 
