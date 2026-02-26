@@ -4,12 +4,15 @@ Async PostgreSQL connection pool for the knowledge graph.
 The pool is created lazily and bound to the running event loop.
 If the loop changes (e.g. between pytest functions), the stale pool
 is discarded and a fresh one is created automatically.
+
+Connects to Azure Database for PostgreSQL Flexible Server with SSL.
 """
 
 from __future__ import annotations
 
 import asyncio
 import os
+import ssl
 import logging
 
 import asyncpg
@@ -20,6 +23,12 @@ logger = logging.getLogger("kg.db")
 
 _pool: asyncpg.Pool | None = None
 _pool_loop: asyncio.AbstractEventLoop | None = None
+
+
+def _create_ssl_context() -> ssl.SSLContext:
+    """Create an SSL context for Azure PostgreSQL connections."""
+    ctx = ssl.create_default_context()
+    return ctx
 
 
 async def get_pool() -> asyncpg.Pool:
@@ -41,10 +50,11 @@ async def get_pool() -> asyncpg.Pool:
     if _pool is None:
         _pool = await asyncpg.create_pool(
             host=os.getenv("PG_HOST", "localhost"),
-            port=int(os.getenv("PG_PORT", "5433")),
-            user=os.getenv("PG_USER", "app"),
-            password=os.getenv("PG_PASSWORD", "app_pwd"),
+            port=int(os.getenv("PG_PORT", "5432")),
+            user=os.getenv("PG_USER", "pgadmin"),
+            password=os.getenv("PG_PASSWORD", ""),
             database=os.getenv("PG_DATABASE", "appdb"),
+            ssl=_create_ssl_context(),
             min_size=1,
             max_size=10,
         )

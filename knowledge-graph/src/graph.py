@@ -33,7 +33,6 @@ async def _cypher(pool: asyncpg.Pool, query: str, return_cols: str) -> list[asyn
         SELECT * FROM cypher('biomedical', $$ {query} $$) AS ({return_cols});
     """
     async with pool.acquire() as conn:
-        await conn.execute("LOAD 'age';")
         await conn.execute('SET search_path = ag_catalog, "$user", public;')
         return await conn.fetch(sql)
 

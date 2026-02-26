@@ -18,6 +18,7 @@ logger = logging.getLogger("kg.load_nodes")
 
 async def main():
     import os
+    import ssl
     from dotenv import load_dotenv
     load_dotenv()
 
@@ -49,12 +50,14 @@ async def main():
     embeddings = compute_embeddings(client, texts)
 
     # Connect to PG and insert
+    ssl_ctx = ssl.create_default_context()
     pool = await asyncpg.create_pool(
         host=os.getenv("PG_HOST", "localhost"),
-        port=int(os.getenv("PG_PORT", "5433")),
-        user=os.getenv("PG_USER", "app"),
-        password=os.getenv("PG_PASSWORD", "app_pwd"),
+        port=int(os.getenv("PG_PORT", "5432")),
+        user=os.getenv("PG_USER", "pgadmin"),
+        password=os.getenv("PG_PASSWORD", ""),
         database=os.getenv("PG_DATABASE", "appdb"),
+        ssl=ssl_ctx,
     )
 
     import json

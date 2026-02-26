@@ -40,17 +40,19 @@ async def _cypher(conn: asyncpg.Connection, query: str, return_cols: str = "v ag
 
 
 async def main():
+    import ssl
+    ssl_ctx = ssl.create_default_context()
     pool = await asyncpg.create_pool(
         host=os.getenv("PG_HOST", "localhost"),
-        port=int(os.getenv("PG_PORT", "5433")),
-        user=os.getenv("PG_USER", "app"),
-        password=os.getenv("PG_PASSWORD", "app_pwd"),
+        port=int(os.getenv("PG_PORT", "5432")),
+        user=os.getenv("PG_USER", "pgadmin"),
+        password=os.getenv("PG_PASSWORD", ""),
         database=os.getenv("PG_DATABASE", "appdb"),
+        ssl=ssl_ctx,
     )
 
     async with pool.acquire() as conn:
-        # Enable AGE in this session
-        await conn.execute("LOAD 'age';")
+        # Enable AGE search path in this session
         await conn.execute("SET search_path = ag_catalog, \"$user\", public;")
 
         # --- Step 1: Create vertices for all nodes ---

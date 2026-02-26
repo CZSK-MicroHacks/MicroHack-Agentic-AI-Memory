@@ -24,11 +24,18 @@ resource "azurerm_postgresql_flexible_server" "main" {
   tags = var.tags
 }
 
-# Enable pgvector extension
-resource "azurerm_postgresql_flexible_server_configuration" "pgvector" {
+# Enable pgvector + AGE extensions
+resource "azurerm_postgresql_flexible_server_configuration" "extensions" {
   name      = "azure.extensions"
   server_id = azurerm_postgresql_flexible_server.main.id
-  value     = "VECTOR"
+  value     = "AGE,VECTOR"
+}
+
+# AGE requires shared_preload_libraries
+resource "azurerm_postgresql_flexible_server_configuration" "shared_preload_libraries" {
+  name      = "shared_preload_libraries"
+  server_id = azurerm_postgresql_flexible_server.main.id
+  value     = "age"
 }
 
 # Firewall rule: allow Azure services
@@ -37,6 +44,14 @@ resource "azurerm_postgresql_flexible_server_firewall_rule" "allow_azure" {
   server_id = azurerm_postgresql_flexible_server.main.id
   start_ip_address = "0.0.0.0"
   end_ip_address   = "0.0.0.0"
+}
+
+# Firewall rule: allow client IP for development
+resource "azurerm_postgresql_flexible_server_firewall_rule" "allow_client" {
+  name             = "AllowClientIP"
+  server_id        = azurerm_postgresql_flexible_server.main.id
+  start_ip_address = var.client_ip
+  end_ip_address   = var.client_ip
 }
 
 # Database

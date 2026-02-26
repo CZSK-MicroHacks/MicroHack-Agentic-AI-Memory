@@ -114,6 +114,12 @@ variable "postgres_password_auth_enabled" {
   default     = true
 }
 
+variable "client_ip" {
+  description = "Client IP address to allow through the PostgreSQL firewall for development access."
+  type        = string
+  default     = ""
+}
+
 
 
 # -----------------------------------------------------------------------------

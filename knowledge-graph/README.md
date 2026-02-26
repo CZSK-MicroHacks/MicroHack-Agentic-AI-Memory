@@ -5,7 +5,7 @@ A GraphRAG-inspired knowledge graph demo using **Biomedical Drug Interactions** 
 ## Architecture
 
 ```
-PostgreSQL (single container)
+Azure Database for PostgreSQL Flexible Server (PG 16)
 ├── pgvector extension      → semantic search (cosine similarity)
 ├── tsvector / GIN index    → full-text keyword search
 └── Apache AGE extension    → graph structure (Cypher queries)
@@ -144,24 +144,28 @@ The agent's tool call trace is displayed in both the interactive agent and the c
 ## Quick Start
 
 ### Prerequisites
-- Docker & Docker Compose
+- Azure subscription with deployed infrastructure (see `infra/` Terraform)
 - Python 3.11+ with [uv](https://docs.astral.sh/uv/)
 - Azure OpenAI resource with `gpt-4o-mini` and `text-embedding-3-large` deployments
+- Azure Database for PostgreSQL Flexible Server with AGE and pgvector extensions enabled
 
-### 1. Start PostgreSQL (pgvector + AGE)
+### 1. Azure PostgreSQL Setup
 
+The PostgreSQL Flexible Server is deployed via Terraform in the `infra/` directory with:
+- `azure.extensions`: AGE, VECTOR
+- `shared_preload_libraries`: age
+- Firewall rules for Azure services and your client IP
+
+Ensure the server is running:
 ```bash
-cd knowledge-graph
-docker compose up -d
+az postgres flexible-server start --name <server-name> --resource-group <rg-name>
 ```
-
-This builds a custom Docker image with PostgreSQL 16 + pgvector + Apache AGE and initializes the schema automatically.
 
 ### 2. Configure Environment
 
 ```bash
 cp .env.example .env
-# Edit .env with your Azure OpenAI endpoint
+# Edit .env with your Azure PostgreSQL and OpenAI endpoints
 ```
 
 ### 3. Install Dependencies
@@ -170,7 +174,17 @@ cp .env.example .env
 uv sync
 ```
 
-### 4. Generate & Load Data
+### 4. Initialize Database Schema
+
+Connect to Azure PostgreSQL and run the init scripts:
+```bash
+# Using psql or any PostgreSQL client against your Azure endpoint
+psql "host=<server>.postgres.database.azure.com port=5432 dbname=appdb user=pgadmin sslmode=require" -f init/001_extensions.sql
+psql "host=<server>.postgres.database.azure.com port=5432 dbname=appdb user=pgadmin sslmode=require" -f init/002_nodes_table.sql
+psql "host=<server>.postgres.database.azure.com port=5432 dbname=appdb user=pgadmin sslmode=require" -f init/003_age_graph.sql
+```
+
+### 5. Generate & Load Data
 
 ```bash
 cd scripts
@@ -180,12 +194,12 @@ uv run python generate_entities.py
 uv run python generate_relationships.py   # Phase 1: initial + Phase 2: enrichment batches
 uv run python generate_concepts.py
 
-# Load into PostgreSQL (computes embeddings + populates AGE graph)
+# Load into Azure PostgreSQL (computes embeddings + populates AGE graph)
 uv run python load_nodes.py
 uv run python load_graph.py
 ```
 
-### 5. Run Tests
+### 6. Run Tests
 
 ```bash
 cd ..
@@ -194,7 +208,7 @@ uv run python -m pytest tests/ -v
 
 Expected: 31 tests passing across search, graph, tools, and comparison test files.
 
-### 6. Run the Comparison Demo
+### 7. Run the Comparison Demo
 
 ```bash
 uv run python comparison_demo.py
@@ -202,7 +216,7 @@ uv run python comparison_demo.py
 
 Shows 5 curated questions answered by RAG-only (single hybrid search) vs the agentic graph agent (LLM-driven multi-tool exploration). Each question includes tool call traces showing how the agent autonomously decided what to search and traverse.
 
-### 7. Run the Interactive Agent
+### 8. Run the Interactive Agent
 
 ```bash
 uv run python agent.py
@@ -210,11 +224,11 @@ uv run python agent.py
 
 Type questions or `examples` to see sample queries. The agent uses **OpenAI function-calling** to autonomously decide which tools to invoke — it discovers relationships, expands communities, and finds shared connections without being told which edges to follow.
 
-### 8. Run the Graphical Comparison Demo (Web UI)
+### 9. Run the Graphical Comparison Demo (Web UI)
 
 ```bash
 # Build the frontend (one-time)
-cd web && npm install && npm run build && cd ..
+cd web && npm install && npm run build && npm run dev
 
 # Start the API server (serves both API and frontend)
 uv run python api_server.py
@@ -222,12 +236,12 @@ uv run python api_server.py
 
 Open http://localhost:8080 in your browser. Select any of the 5 curated questions to see a side-by-side comparison of RAG-only vs agentic graph search, complete with tool call traces.
 
+![](/images/knowledge-graph.png)
+
 ## File Structure
 
 ```
 knowledge-graph/
-├── docker-compose.yml          # PG16 + pgvector + AGE container
-├── Dockerfile                  # Custom image building AGE from source
 ├── pyproject.toml              # Python dependencies
 ├── .env.example                # Config template
 ├── init/
@@ -267,6 +281,7 @@ knowledge-graph/
 | HNSW index (not IVFFlat) | pgvector's IVFFlat caps at 2000 dims; HNSW supports our 1536-dim vectors |
 | 1536-dim embeddings | `text-embedding-3-large` supports dimension reduction; 1536 fits pgvector index limits while retaining quality |
 | Apache AGE for graph | Cypher queries, runs in-process with PG (no separate graph DB), ACID guarantees |
+| Azure Database for PostgreSQL | Managed service with native support for pgvector and AGE extensions |
 | LLM-generated data | Reproducible, realistic; makes the lab self-contained |
 | Pool per event-loop | Prevents stale connection errors when pytest creates new event loops per test |
 
@@ -274,11 +289,11 @@ knowledge-graph/
 
 | Component | Technology | Purpose |
 |-----------|-----------|---------|
-| Database | PostgreSQL 16 | Unified store |
+| Database | Azure Database for PostgreSQL Flexible Server (PG 16) | Unified managed store |
 | Vector search | pgvector (HNSW) | Semantic similarity |
 | Full-text search | tsvector + GIN | Keyword matching |
-| Graph engine | Apache AGE 1.5.0 | Cypher traversal |
+| Graph engine | Apache AGE 1.6.0 | Cypher traversal |
 | Embeddings | Azure OpenAI `text-embedding-3-large` | 1536-dim vectors |
 | LLM | Azure OpenAI `gpt-4o-mini` | Data generation, agent reasoning |
 | Runtime | Python 3.11+ (asyncpg) | Async database access |
-| Container | Docker Compose | Local development |
+| Infrastructure | Terraform | Azure resource provisioning |
