@@ -1,15 +1,17 @@
 # server.py
 """
-AG-UI Customer Support Server with Server-Side Session Management
+AG-UI Customer Support Server with Responses API (store=false)
 
-This server manages conversation history on the server side using Microsoft Agent Framework's
-AgentThread and ChatMessageStore. Sessions are stored in-memory by default, with optional
-Redis persistence for production deployments.
+This server uses the Azure OpenAI Responses API with store=false and
+client-side state via ChatMessageStoreProtocol.  The framework manages
+conversation history in-memory via AgentThread.message_store; the backend
+serialises/deserialises thread state between turns.
 
 Architecture:
-- SessionManager: Manages thread lifecycle (create, get, delete, list)
-- AgentThread: Maintains per-session message history automatically
-- ChatMessageStore: In-memory message storage per thread
+- SessionManager: Manages AgentThread instances with serialised thread
+  state (in-memory dict now; Redis-backed later)
+- AzureOpenAIResponsesClient + ChatAgent with store=false: client-managed state
+- Cosmos DB: Durable conversation history for cross-session retrieval
 - Custom AG-UI endpoint: Integrates session management with streaming responses
 """
 
@@ -41,9 +43,8 @@ from user_profile_memory import UserProfileMemoryStore
 from profile_agent import ProfileAgent
 from agent_tools import AgentTools
 
-from agent_framework import ChatAgent, AgentThread, ChatMessageStore
-from agent_framework._threads import ChatMessage
-from agent_framework.azure import AzureOpenAIChatClient
+from agent_framework import ChatAgent, AgentThread
+from agent_framework.azure import AzureOpenAIChatClient, AzureOpenAIResponsesClient
 from azure.identity import DefaultAzureCredential
 
 # AG-UI event classes and encoder
@@ -127,60 +128,43 @@ class SessionInfo(BaseModel):
 
 class SessionManager:
     """
-    Manages conversation sessions with server-side history storage.
-    
-    Each session maps to an AgentThread which maintains its own message history
-    via ChatMessageStore. This enables:
-    - Automatic context maintenance across turns
-    - Session persistence without frontend state
-    - Easy serialization for external storage (Redis, DB, etc.)
+    Session tracker with client-side thread state (store=false mode).
+
+    Each session maps to an AgentThread whose ``message_store`` holds the
+    full conversation.  Serialised thread state is kept in ``_thread_states``
+    so evicted sessions can be restored without the Responses API.
+    Swap ``_thread_states`` for a Redis-backed dict to persist across restarts.
     """
-    
-    def __init__(self, max_sessions: int = 1000, max_messages_per_session: int = 100):
-        """
-        Initialize the session manager.
-        
-        Args:
-            max_sessions: Maximum number of concurrent sessions (LRU eviction)
-            max_messages_per_session: Maximum messages to retain per session
-        """
+
+    def __init__(self, max_sessions: int = 1000):
         self._sessions: dict[str, AgentThread] = {}
+        self._thread_states: dict[str, dict] = {}  # serialised thread snapshots
         self._session_metadata: dict[str, dict[str, Any]] = {}
+        self._message_counts: dict[str, int] = {}  # local turn counter
         self._max_sessions = max_sessions
-        self._max_messages = max_messages_per_session
-    
+
+    # ── create ────────────────────────────────────────────────────────────
+
     def create_session(
         self,
         session_id: str | None = None,
         title: str | None = None,
         user_id: str | None = None,
     ) -> str:
-        """
-        Create a new chat session with an empty message store.
-        
-        Args:
-            session_id: Optional custom session ID. If None, generates a UUID.
-            title: Optional human-readable title for the session.
-            user_id: Owner user ID for this session.
-        
-        Returns:
-            The session ID for the new session.
-        """
+        """Create a new session with a bare AgentThread (store=false)."""
         if session_id is None:
             session_id = str(uuid.uuid4())
-        
+
         # Evict oldest session if at capacity
         if len(self._sessions) >= self._max_sessions:
             oldest_id = min(
-                self._session_metadata.keys(),
-                key=lambda k: self._session_metadata[k].get("last_activity", "")
+                self._session_metadata,
+                key=lambda k: self._session_metadata[k].get("last_activity", ""),
             )
             self.delete_session(oldest_id)
-        
-        # Create thread with in-memory message store
-        message_store = ChatMessageStore(messages=[])
-        thread = AgentThread(message_store=message_store)
-        
+
+        thread = AgentThread()
+
         self._sessions[session_id] = thread
         self._session_metadata[session_id] = {
             "title": title,
@@ -188,108 +172,38 @@ class SessionManager:
             "last_activity": datetime.utcnow().isoformat(),
             "user_id": user_id,
         }
-        
+        self._message_counts[session_id] = 0
         return session_id
-    
-    def create_session_from_history(
-        self,
-        session_id: str,
-        history_messages: list[dict[str, Any]],
-        title: str | None = None,
-        user_id: str | None = None,
-    ) -> str:
-        """
-        Create a session pre-populated with historical messages from Cosmos DB.
-        
-        Used when resuming a conversation whose live session has been evicted.
-        """
-        # Evict oldest session if at capacity
-        if len(self._sessions) >= self._max_sessions:
-            oldest_id = min(
-                self._session_metadata.keys(),
-                key=lambda k: self._session_metadata[k].get("last_activity", "")
-            )
-            self.delete_session(oldest_id)
-        
-        # Convert stored message dicts to ChatMessage objects
-        chat_messages: list[ChatMessage] = []
-        for msg in history_messages:
-            role = msg.get("role", "user")
-            text = msg.get("content", "")
-            if role in ("user", "assistant", "system"):
-                chat_messages.append(ChatMessage(role=role, text=text))
-        
-        message_store = ChatMessageStore(messages=chat_messages)
-        thread = AgentThread(message_store=message_store)
-        
-        self._sessions[session_id] = thread
-        self._session_metadata[session_id] = {
-            "title": title,
-            "created_at": datetime.utcnow().isoformat(),
-            "last_activity": datetime.utcnow().isoformat(),
-            "user_id": user_id,
-        }
-        
-        logger.info(
-            "Restored session from history id=%s messages=%d",
-            session_id,
-            len(chat_messages),
-        )
-        return session_id
-    
+
+    # ── get ───────────────────────────────────────────────────────────────
+
     def get_session(self, session_id: str, auto_create: bool = True) -> AgentThread | None:
-        """
-        Retrieve an existing session's thread.
-        
-        Args:
-            session_id: The session ID to look up.
-            auto_create: If True, creates a new session if not found.
-        
-        Returns:
-            The AgentThread for the session, or None if not found and auto_create is False.
-        """
         if session_id not in self._sessions:
-            if auto_create:
+            # Try restoring from serialised thread state
+            if session_id in self._thread_states:
+                thread = AgentThread.deserialize(self._thread_states[session_id])
+                self._sessions[session_id] = thread
+            elif auto_create:
                 self.create_session(session_id)
             else:
                 return None
-        
-        # Update last activity
         if session_id in self._session_metadata:
             self._session_metadata[session_id]["last_activity"] = datetime.utcnow().isoformat()
-        
         return self._sessions.get(session_id)
-    
+
+    # ── delete / update ───────────────────────────────────────────────────
+
     def delete_session(self, session_id: str) -> bool:
-        """
-        Delete a session and its message history.
-        
-        Args:
-            session_id: The session ID to delete.
-        
-        Returns:
-            True if session was deleted, False if not found.
-        """
-        if session_id in self._sessions:
-            del self._sessions[session_id]
-            self._session_metadata.pop(session_id, None)
-            return True
-        return False
-    
+        existed = session_id in self._sessions or session_id in self._thread_states
+        self._sessions.pop(session_id, None)
+        self._thread_states.pop(session_id, None)
+        self._session_metadata.pop(session_id, None)
+        self._message_counts.pop(session_id, None)
+        return existed
+
     def update_session(self, session_id: str, title: str | None = None) -> bool:
-        """
-        Update session metadata.
-        
-        Args:
-            session_id: The session ID to update.
-            title: New title for the session (None leaves unchanged).
-        
-        Returns:
-            True if session was updated, False if not found.
-        """
         if session_id not in self._sessions:
             return False
-        
         metadata = self._session_metadata.get(session_id, {})
         if title is not None:
             metadata["title"] = title
@@ -297,30 +211,33 @@ class SessionManager:
         self._session_metadata[session_id] = metadata
         return True
 
-    async def get_session_info(self, session_id: str) -> SessionInfo | None:
-        """Get information about a specific session."""
+    def increment_message_count(self, session_id: str, n: int = 2) -> None:
+        """Increment message count (default +2 for user+assistant turn)."""
+        self._message_counts[session_id] = self._message_counts.get(session_id, 0) + n
+
+    # ── info / list ───────────────────────────────────────────────────────
+
+    def save_thread_state(self, session_id: str) -> None:
+        """Serialise the current thread and store in ``_thread_states``."""
         thread = self._sessions.get(session_id)
-        if thread is None:
+        if thread is not None:
+            self._thread_states[session_id] = thread.serialize()
+
+    async def get_session_info(self, session_id: str) -> SessionInfo | None:
+        thread = self._sessions.get(session_id)
+        if thread is None and session_id not in self._thread_states:
             return None
-        
         metadata = self._session_metadata.get(session_id, {})
-        message_count = 0
-        
-        if thread.message_store:
-            messages = await thread.message_store.list_messages()
-            message_count = len(messages) if messages else 0
-        
         return SessionInfo(
             session_id=session_id,
             title=metadata.get("title"),
             created_at=metadata.get("created_at", "unknown"),
-            message_count=message_count,
+            message_count=self._message_counts.get(session_id, 0),
             last_activity=metadata.get("last_activity"),
         )
-    
+
     async def list_sessions(self, user_id: str | None = None) -> list[SessionInfo]:
-        """List active sessions, optionally filtered by user."""
-        sessions = []
+        sessions: list[SessionInfo] = []
         for session_id in self._sessions:
             if user_id is not None:
                 meta = self._session_metadata.get(session_id, {})
@@ -330,55 +247,10 @@ class SessionManager:
             if info:
                 sessions.append(info)
         return sessions
-    
-    async def get_session_history(self, session_id: str) -> list[dict[str, Any]] | None:
-        """
-        Get the full message history for a session.
-        
-        Returns a list of message dicts with role and content.
-        """
-        thread = self._sessions.get(session_id)
-        if thread is None or thread.message_store is None:
-            return None
-        
-        messages = await thread.message_store.list_messages()
-        if messages is None:
-            return []
-        
-        result = []
-        for msg in messages:
-            role = msg.role.value if hasattr(msg.role, 'value') else str(msg.role)
-            text = msg.text if hasattr(msg, 'text') and msg.text else ""
-
-            # Extract tool calls and results from contents
-            tool_calls = []
-            tool_results = []
-            for c in (msg.contents or []):
-                ctype = getattr(c, 'type', None)
-                if ctype == 'function_call':
-                    tool_calls.append({
-                        "call_id": getattr(c, 'call_id', None),
-                        "name": getattr(c, 'name', None),
-                        "arguments": getattr(c, 'arguments', None),
-                    })
-                elif ctype == 'function_result':
-                    res = getattr(c, 'result', None)
-                    tool_results.append({
-                        "call_id": getattr(c, 'call_id', None),
-                        "result": json.dumps(res) if isinstance(res, (dict, list)) else str(res) if res else "",
-                    })
-
-            entry: dict[str, Any] = {"role": role, "content": text}
-            if tool_calls:
-                entry["tool_calls"] = tool_calls
-            if tool_results:
-                entry["tool_results"] = tool_results
-            result.append(entry)
-        return result
 
 
 # Initialize the session manager
-session_manager = SessionManager(max_sessions=1000, max_messages_per_session=100)
+session_manager = SessionManager(max_sessions=1000)
 
 # Initialize the conversation history store (Cosmos DB)
 conversation_store = ConversationHistoryStore()
@@ -400,10 +272,21 @@ classic_rag_client = ClassicRAGClient()
 # Agent Configuration
 # =============================================================================
 
-# Initialize Azure OpenAI Chat client
+# Initialize Azure OpenAI Chat client (used by MemoryAgent / ProfileAgent for
+# summarisation and embedding — these don't need conversation state).
 chat_client = AzureOpenAIChatClient(
     credential=DefaultAzureCredential(),
     endpoint=openai_endpoint,
+    deployment_name=model_deployment,
+)
+
+# Initialize Azure OpenAI Responses client for the main customer-support agent.
+# Uses the Responses API with store=true and conversation-based server-side state.
+# base_url must point to /openai/v1/ for the Responses API on cognitiveservices endpoints.
+responses_client = AzureOpenAIResponsesClient(
+    credential=DefaultAzureCredential(),
+    endpoint=openai_endpoint,
+    base_url=f"{openai_endpoint.rstrip('/')}/openai/v1/",
     deployment_name=model_deployment,
 )
 
@@ -422,12 +305,15 @@ agent_tools = AgentTools(
     classic_rag_client=classic_rag_client,
 )
 
-# Configure the default agent (no profile — used as fallback)
+# Configure the default agent (no profile — used as fallback).
+# Uses AzureOpenAIResponsesClient with store=False — conversation history
+# is managed client-side via ChatMessageStoreProtocol in AgentThread.
 agent = ChatAgent(
     name="CustomerSupportAgent",
     instructions=CUSTOMER_SUPPORT_PROMPT,
-    chat_client=chat_client,
+    chat_client=responses_client,
     tools=agent_tools.all,
+    default_options={"store": False},
 )
 
 
@@ -454,8 +340,9 @@ def _build_personalized_agent(
     return ChatAgent(
         name="CustomerSupportAgent",
         instructions=prompt,
-        chat_client=chat_client,
+        chat_client=responses_client,
         tools=tools,
+        default_options={"store": False},
     )
 
 
@@ -630,12 +517,15 @@ async def get_session_history(
     session_id: str,
     current_user: User = Depends(get_current_user),
 ):
-    """Get the full message history for a session."""
+    """Get the full message history for a session.
+
+    Served from the durable Cosmos DB copy of the conversation.
+    """
     _assert_session_owner(session_id, current_user.user_id)
-    history = await session_manager.get_session_history(session_id)
-    if history is None:
+    doc = await conversation_store.get_conversation(session_id, current_user.user_id)
+    if doc is None:
         raise HTTPException(status_code=404, detail="Session not found")
-    return {"session_id": session_id, "messages": history}
+    return {"session_id": session_id, "messages": doc.get("messages", [])}
 
 
 @app.put("/sessions/{session_id}", response_model=SessionInfo)
@@ -1217,24 +1107,46 @@ async def delete_profile(
 # AG-UI Chat Endpoint with Server-Side History
 # =============================================================================
 
-async def _persist_conversation(session_id: str, user_id: str, title: str | None) -> None:
-    """Persist current session history to Cosmos DB after a completed run."""
+async def _persist_turn(
+    session_id: str,
+    user_id: str,
+    user_message: str,
+    assistant_message: str,
+    title: str | None,
+) -> None:
+    """Append the latest user+assistant turn to the Cosmos DB conversation."""
     try:
-        history = await session_manager.get_session_history(session_id)
-        if history is not None:
-            metadata = {
-                "agent_name": "CustomerSupportAgent",
-                "model_deployment": model_deployment,
-            }
-            await conversation_store.save_conversation(
-                session_id=session_id,
-                user_id=user_id,
-                messages=history,
-                title=title,
-                metadata=metadata,
-            )
+        new_messages = [
+            {"role": "user", "content": user_message},
+            {"role": "assistant", "content": assistant_message},
+        ]
+        metadata: dict[str, Any] = {
+            "agent_name": "CustomerSupportAgent",
+            "model_deployment": model_deployment,
+            "api": "responses",
+            "store": False,
+        }
+
+        # Fetch existing conversation to append
+        existing = await conversation_store.get_conversation(session_id, user_id)
+        if existing and existing.get("messages"):
+            all_messages = existing["messages"] + new_messages
+            # Merge metadata — keep existing keys, overwrite with new
+            old_meta = existing.get("metadata") or {}
+            old_meta.update(metadata)
+            metadata = old_meta
+        else:
+            all_messages = new_messages
+
+        await conversation_store.save_conversation(
+            session_id=session_id,
+            user_id=user_id,
+            messages=all_messages,
+            title=title,
+            metadata=metadata,
+        )
     except Exception as e:
-        logger.error("Failed to persist conversation id=%s: %s", session_id, str(e), exc_info=True)
+        logger.error("Failed to persist turn id=%s: %s", session_id, str(e), exc_info=True)
 
 
 async def stream_agent_response(
@@ -1321,13 +1233,19 @@ async def stream_agent_response(
                         yield encoder.encode(ToolCallEndEvent(toolCallId=call_id))
         
         # Log the full assembled assistant response
-        assistant_message = "".join(full_response_text)
-        logger.info("[OUT] session=%s run=%s event=RUN_FINISHED response=%s", session_id, run_id, assistant_message)
+        assistant_text = "".join(full_response_text)
+        logger.info("[OUT] session=%s run=%s event=RUN_FINISHED response=%s", session_id, run_id, assistant_text)
         yield encoder.encode(RunFinishedEvent(thread_id=session_id, run_id=run_id))
 
-        # Persist conversation to Cosmos DB after every completed run
+        # With store=false the framework keeps messages in thread.message_store.
+        # Serialise the thread state so it can survive session eviction.
+        session_manager.save_thread_state(session_id)
+        logger.info("session=%s thread_state_saved", session_id)
+
+        # Track message count and persist the turn to Cosmos DB
+        session_manager.increment_message_count(session_id)
         session_title = session_manager._session_metadata.get(session_id, {}).get("title")
-        await _persist_conversation(session_id, user_id, session_title)
+        await _persist_turn(session_id, user_id, user_message, assistant_text, session_title)
 
     except Exception as e:
         logger.error("[OUT] session=%s run=%s event=RUN_ERROR error=%s", session_id, run_id, str(e), exc_info=True)
@@ -1343,38 +1261,28 @@ async def chat(
     current_user: User = Depends(get_current_user),
 ):
     """
-    AG-UI compatible chat endpoint with server-side session management.
-    
+    AG-UI compatible chat endpoint with Responses API conversations.
+
     - If thread_id is provided, uses existing session (creates if not found)
     - If thread_id is not provided, creates a new session
-    - Message history is maintained server-side via AgentThread
+    - Conversation history is maintained server-side by the Responses API
     - Frontend only needs to send the new user message
     """
     # Get or create session
     session_id = request.thread_id or str(uuid.uuid4())
-    # If session already exists, verify ownership
-    if session_id in session_manager._sessions:
+    # If session already exists (live or serialised), verify ownership
+    if session_id in session_manager._sessions or session_id in session_manager._thread_states:
         _assert_session_owner(session_id, current_user.user_id)
     else:
-        # Session not in memory — check if conversation history exists in Cosmos DB
-        # so we can resume with full context instead of starting fresh.
+        # Session not in memory — create a fresh one.
         conversation = await conversation_store.get_conversation(
             session_id, current_user.user_id
         )
-        if conversation and conversation.get("messages"):
-            session_manager.create_session_from_history(
-                session_id,
-                history_messages=conversation["messages"],
-                title=conversation.get("title"),
-                user_id=current_user.user_id,
-            )
-            logger.info(
-                "Resumed conversation from Cosmos DB id=%s messages=%d",
-                session_id,
-                len(conversation["messages"]),
-            )
-        else:
-            session_manager.create_session(session_id, user_id=current_user.user_id)
+        session_manager.create_session(
+            session_id,
+            title=conversation.get("title") if conversation else None,
+            user_id=current_user.user_id,
+        )
     thread = session_manager.get_session(session_id, auto_create=False)
     
     if thread is None:
