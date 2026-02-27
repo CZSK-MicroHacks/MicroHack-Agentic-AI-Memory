@@ -13,8 +13,10 @@ import json
 import logging
 import os
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any
 
+import jinja2
 from agent_framework import ChatAgent, AgentThread, ChatMessageStore
 from agent_framework.azure import AzureOpenAIChatClient
 from azure.identity import DefaultAzureCredential, get_bearer_token_provider
@@ -22,23 +24,14 @@ from openai import AsyncAzureOpenAI
 
 logger = logging.getLogger("ag_ui.memory_agent")
 
-SUMMARIZATION_PROMPT = """\
-You are a conversation memory assistant. Your job is to create a concise,
-meaningful summary of a customer support conversation.
+_PROMPTS_DIR = Path(__file__).resolve().parent / "prompts"
+_jinja_env = jinja2.Environment(
+    loader=jinja2.FileSystemLoader(str(_PROMPTS_DIR)),
+    keep_trailing_newline=True,
+    undefined=jinja2.StrictUndefined,
+)
 
-Rules:
-- Capture the main topic, customer intent, and resolution (if any).
-- Include key entities: order IDs, product names, dates, names.
-- Keep the summary to 2-4 sentences maximum.
-- Write in third person, past tense.
-- Do NOT include greetings, filler, or meta-commentary.
-- Output ONLY the summary text, nothing else.
-
-Example:
-  "Customer inquired about order ORD-001 shipping status. The order was
-   confirmed as shipped with tracking number 1Z999AA1, estimated delivery
-   Jan 25, 2026."
-"""
+SUMMARIZATION_PROMPT = _jinja_env.get_template("conversation_memory.j2").render().strip()
 
 
 @dataclass
