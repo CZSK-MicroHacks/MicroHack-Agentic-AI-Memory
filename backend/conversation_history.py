@@ -3,7 +3,7 @@
 Conversation History Store — persists full conversations in Azure Cosmos DB.
 
 Distinction from SessionManager:
-  - SessionManager handles *live* session state (AgentThread + ChatMessageStore)
+  - SessionManager handles *live* session state (AgentSession)
     for the currently active conversation turn. Ephemeral / in-memory.
   - ConversationHistoryStore is the *durable* record of every conversation,
     stored as a JSON document in Cosmos DB with full metadata.

@@ -5,7 +5,7 @@ description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
-    "agent-framework-ag-ui>=1.0.0b260130",
+    "agent-framework-ag-ui>=1.0.0b260304",
     "aiohttp>=3.9.0",
     "asyncpg>=0.30.0",
     "azure-cosmos>=4.9.0",

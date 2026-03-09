@@ -2,7 +2,7 @@
 """
 Agent tools for the Customer Support Agent.
 
-Encapsulates all @tool-decorated functions used by the ChatAgent,
+Encapsulates all @tool-decorated functions used by the Agent,
 with dependencies injected via the AgentTools class constructor.
 """
 
@@ -54,7 +54,7 @@ class AgentTools:
 
         tools = AgentTools(memory_store, memory_agent, profile_store, rag_client)
         # Pass bound methods as tools:
-        agent = ChatAgent(..., tools=tools.all)
+        agent = Agent(..., tools=tools.all)
         # Before each agent run:
         tools.set_user_id(user_id)
     """

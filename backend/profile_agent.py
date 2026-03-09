@@ -3,7 +3,7 @@
 Profile Agent — extracts personal facts from a conversation and merges them
 into an existing user profile.
 
-Uses Microsoft Agent Framework ChatAgent with Azure OpenAI to analyse
+Uses Microsoft Agent Framework Agent with Azure OpenAI to analyse
 conversation transcripts and return a structured JSON profile update.
 """
 
@@ -15,7 +15,7 @@ import re
 from dataclasses import dataclass, field
 from typing import Any
 
-from agent_framework import ChatAgent, AgentThread, ChatMessageStore
+from agent_framework import Agent, AgentSession
 from agent_framework.azure import AzureOpenAIChatClient
 
 logger = logging.getLogger("ag_ui.profile_agent")
@@ -85,10 +85,10 @@ class ProfileAgent:
     """Extracts user profile facts from conversations."""
 
     def __init__(self, chat_client: AzureOpenAIChatClient):
-        self._agent = ChatAgent(
+        self._agent = Agent(
             name="ProfileExtractor",
             instructions=PROFILE_EXTRACTION_PROMPT,
-            chat_client=chat_client,
+            client=chat_client,
         )
 
     async def extract_profile(
@@ -168,11 +168,11 @@ class ProfileAgent:
         return "\n".join(parts)
 
     async def _run_agent(self, prompt_input: str) -> str:
-        """Run the ChatAgent and collect the full response."""
-        thread = AgentThread(message_store=ChatMessageStore(messages=[]))
+        """Run the Agent and collect the full response."""
+        session = AgentSession()
 
         full_text: list[str] = []
-        async for update in self._agent.run_stream(prompt_input, thread=thread):
+        async for update in self._agent.run(prompt_input, stream=True, session=session):
             if update.text:
                 full_text.append(update.text)
 

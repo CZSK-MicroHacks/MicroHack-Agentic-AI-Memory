@@ -3,14 +3,14 @@
 AG-UI Customer Support Server with Responses API (store=false)
 
 This server uses the Azure OpenAI Responses API with store=false and
-client-side state via ChatMessageStoreProtocol.  The framework manages
-conversation history in-memory via AgentThread.message_store; the backend
-serialises/deserialises thread state between turns.
+client-side state via AgentSession.  The framework manages
+conversation history in-memory via AgentSession; the backend
+serialises/deserialises session state between turns.
 
 Architecture:
-- SessionManager: Manages AgentThread instances with serialised thread
+- SessionManager: Manages AgentSession instances with serialised session
   state (in-memory dict now; Redis-backed later)
-- AzureOpenAIResponsesClient + ChatAgent with store=false: client-managed state
+- AzureOpenAIResponsesClient + Agent with store=false: client-managed state
 - Cosmos DB: Durable conversation history for cross-session retrieval
 - Custom AG-UI endpoint: Integrates session management with streaming responses
 """
@@ -43,7 +43,7 @@ from user_profile_memory import UserProfileMemoryStore
 from profile_agent import ProfileAgent
 from agent_tools import AgentTools
 
-from agent_framework import ChatAgent, AgentThread
+from agent_framework import Agent, AgentSession
 from agent_framework.azure import AzureOpenAIChatClient, AzureOpenAIResponsesClient
 from azure.identity import DefaultAzureCredential
 
@@ -128,17 +128,17 @@ class SessionInfo(BaseModel):
 
 class SessionManager:
     """
-    Session tracker with client-side thread state (store=false mode).
+    Session tracker with client-side session state (store=false mode).
 
-    Each session maps to an AgentThread whose ``message_store`` holds the
-    full conversation.  Serialised thread state is kept in ``_thread_states``
+    Each session maps to an AgentSession whose history holds the
+    full conversation.  Serialised session state is kept in ``_session_states``
     so evicted sessions can be restored without the Responses API.
-    Swap ``_thread_states`` for a Redis-backed dict to persist across restarts.
+    Swap ``_session_states`` for a Redis-backed dict to persist across restarts.
     """
 
     def __init__(self, max_sessions: int = 1000):
-        self._sessions: dict[str, AgentThread] = {}
-        self._thread_states: dict[str, dict] = {}  # serialised thread snapshots
+        self._sessions: dict[str, AgentSession] = {}
+        self._session_states: dict[str, dict] = {}  # serialised session snapshots
         self._session_metadata: dict[str, dict[str, Any]] = {}
         self._message_counts: dict[str, int] = {}  # local turn counter
         self._max_sessions = max_sessions
@@ -151,7 +151,7 @@ class SessionManager:
         title: str | None = None,
         user_id: str | None = None,
     ) -> str:
-        """Create a new session with a bare AgentThread (store=false)."""
+        """Create a new session with a bare AgentSession (store=false)."""
         if session_id is None:
             session_id = str(uuid.uuid4())
 
@@ -163,9 +163,9 @@ class SessionManager:
             )
             self.delete_session(oldest_id)
 
-        thread = AgentThread()
+        session = AgentSession()
 
-        self._sessions[session_id] = thread
+        self._sessions[session_id] = session
         self._session_metadata[session_id] = {
             "title": title,
             "created_at": datetime.utcnow().isoformat(),
@@ -177,12 +177,12 @@ class SessionManager:
 
     # ── get ───────────────────────────────────────────────────────────────
 
-    def get_session(self, session_id: str, auto_create: bool = True) -> AgentThread | None:
+    def get_session(self, session_id: str, auto_create: bool = True) -> AgentSession | None:
         if session_id not in self._sessions:
-            # Try restoring from serialised thread state
-            if session_id in self._thread_states:
-                thread = AgentThread.deserialize(self._thread_states[session_id])
-                self._sessions[session_id] = thread
+            # Try restoring from serialised session state
+            if session_id in self._session_states:
+                session = AgentSession.from_dict(self._session_states[session_id])
+                self._sessions[session_id] = session
             elif auto_create:
                 self.create_session(session_id)
             else:
@@ -194,9 +194,9 @@ class SessionManager:
     # ── delete / update ───────────────────────────────────────────────────
 
     def delete_session(self, session_id: str) -> bool:
-        existed = session_id in self._sessions or session_id in self._thread_states
+        existed = session_id in self._sessions or session_id in self._session_states
         self._sessions.pop(session_id, None)
-        self._thread_states.pop(session_id, None)
+        self._session_states.pop(session_id, None)
         self._session_metadata.pop(session_id, None)
         self._message_counts.pop(session_id, None)
         return existed
@@ -217,15 +217,15 @@ class SessionManager:
 
     # ── info / list ───────────────────────────────────────────────────────
 
-    def save_thread_state(self, session_id: str) -> None:
-        """Serialise the current thread and store in ``_thread_states``."""
-        thread = self._sessions.get(session_id)
-        if thread is not None:
-            self._thread_states[session_id] = thread.serialize()
+    def save_session_state(self, session_id: str) -> None:
+        """Serialise the current session and store in ``_session_states``."""
+        session = self._sessions.get(session_id)
+        if session is not None:
+            self._session_states[session_id] = session.to_dict()
 
     async def get_session_info(self, session_id: str) -> SessionInfo | None:
-        thread = self._sessions.get(session_id)
-        if thread is None and session_id not in self._thread_states:
+        session = self._sessions.get(session_id)
+        if session is None and session_id not in self._session_states:
             return None
         metadata = self._session_metadata.get(session_id, {})
         return SessionInfo(
@@ -307,11 +307,11 @@ agent_tools = AgentTools(
 
 # Configure the default agent (no profile — used as fallback).
 # Uses AzureOpenAIResponsesClient with store=False — conversation history
-# is managed client-side via ChatMessageStoreProtocol in AgentThread.
-agent = ChatAgent(
+# is managed client-side via AgentSession.
+agent = Agent(
     name="CustomerSupportAgent",
     instructions=CUSTOMER_SUPPORT_PROMPT,
-    chat_client=responses_client,
+    client=responses_client,
     tools=agent_tools.all,
     default_options={"store": False},
 )
@@ -321,7 +321,7 @@ def _build_personalized_agent(
     user_profile: dict[str, Any] | None,
     *,
     rag_mode: str = "agentic",
-) -> ChatAgent:
+) -> Agent:
     """Return an agent whose system prompt is enriched with the user profile.
 
     If *user_profile* is ``None`` or empty the global default agent is
@@ -337,10 +337,10 @@ def _build_personalized_agent(
         user_profile=user_profile,
         rag_mode=rag_mode,
     )
-    return ChatAgent(
+    return Agent(
         name="CustomerSupportAgent",
         instructions=prompt,
-        chat_client=responses_client,
+        client=responses_client,
         tools=tools,
         default_options={"store": False},
     )
@@ -1151,16 +1151,16 @@ async def _persist_turn(
 
 async def stream_agent_response(
     user_message: str,
-    thread: AgentThread,
+    session: AgentSession,
     session_id: str,
     user_id: str,
-    personalized_agent: ChatAgent | None = None,
+    personalized_agent: Agent | None = None,
 ) -> AsyncIterator[str]:
     """
     Stream agent response using AG-UI protocol.
     
-    The AgentThread automatically maintains message history, so we just need to:
-    1. Run the agent with the thread
+    The AgentSession automatically maintains message history, so we just need to:
+    1. Run the agent with the session
     2. Stream AG-UI events
     3. History is automatically updated by the framework
     """
@@ -1185,7 +1185,7 @@ async def stream_agent_response(
         # Use personalized agent if available, otherwise fall back to default
         active_agent = personalized_agent or agent
         # Stream agent response - framework handles history automatically
-        async for update in active_agent.run_stream(user_message, thread=thread):
+        async for update in active_agent.run(user_message, stream=True, session=session):
             # Emit text content
             if update.text:
                 full_response_text.append(update.text)
@@ -1237,10 +1237,10 @@ async def stream_agent_response(
         logger.info("[OUT] session=%s run=%s event=RUN_FINISHED response=%s", session_id, run_id, assistant_text)
         yield encoder.encode(RunFinishedEvent(thread_id=session_id, run_id=run_id))
 
-        # With store=false the framework keeps messages in thread.message_store.
-        # Serialise the thread state so it can survive session eviction.
-        session_manager.save_thread_state(session_id)
-        logger.info("session=%s thread_state_saved", session_id)
+        # With store=false the framework keeps messages in the session.
+        # Serialise the session state so it can survive session eviction.
+        session_manager.save_session_state(session_id)
+        logger.info("session=%s session_state_saved", session_id)
 
         # Track message count and persist the turn to Cosmos DB
         session_manager.increment_message_count(session_id)
@@ -1271,7 +1271,7 @@ async def chat(
     # Get or create session
     session_id = request.thread_id or str(uuid.uuid4())
     # If session already exists (live or serialised), verify ownership
-    if session_id in session_manager._sessions or session_id in session_manager._thread_states:
+    if session_id in session_manager._sessions or session_id in session_manager._session_states:
         _assert_session_owner(session_id, current_user.user_id)
     else:
         # Session not in memory — create a fresh one.
@@ -1283,9 +1283,9 @@ async def chat(
             title=conversation.get("title") if conversation else None,
             user_id=current_user.user_id,
         )
-    thread = session_manager.get_session(session_id, auto_create=False)
+    session = session_manager.get_session(session_id, auto_create=False)
     
-    if thread is None:
+    if session is None:
         raise HTTPException(status_code=500, detail="Failed to create session")
     
     # Extract user message from request
@@ -1306,7 +1306,7 @@ async def chat(
     personalized = _build_personalized_agent(user_profile, rag_mode=rag_mode)
 
     return StreamingResponse(
-        stream_agent_response(user_message, thread, session_id, current_user.user_id, personalized),
+        stream_agent_response(user_message, session, session_id, current_user.user_id, personalized),
         media_type="text/event-stream",
         headers={
             "Cache-Control": "no-cache",

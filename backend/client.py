@@ -2,7 +2,7 @@
 import asyncio
 import os
 from dotenv import load_dotenv
-from agent_framework import ChatAgent
+from agent_framework import Agent
 from agent_framework_ag_ui import AGUIChatClient
 
 # Load environment variables from .env file
@@ -19,10 +19,10 @@ async def interactive_chat():
     client = AGUIChatClient(endpoint=base_url)
     
     # Create a local agent representation
-    agent = ChatAgent(chat_client=client)
+    agent = Agent(client=client)
     
-    # Start a new conversation thread
-    conversation_thread = agent.get_new_thread()
+    # Start a new conversation session
+    conversation_thread = agent.create_session()
     
     print("Chat started! Type 'exit' or 'quit' to end the session.\n")
     
@@ -47,7 +47,7 @@ async def interactive_chat():
             # Track tool calls to avoid duplicate prints
             seen_tools = set()
             
-            async for update in agent.run_stream(user_message, thread=conversation_thread):
+            async for update in agent.run(user_message, stream=True, session=conversation_thread):
                 # Display text content
                 if update.text:
                     print(update.text, end="", flush=True)

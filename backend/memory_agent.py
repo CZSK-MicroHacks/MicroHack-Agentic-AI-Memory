@@ -3,7 +3,7 @@
 Memory Agent — summarises a conversation and generates its vector embedding.
 
 Uses:
-  - Microsoft Agent Framework ChatAgent for summarisation (AZURE_OPENAI_DEPLOYMENT_NAME)
+  - Microsoft Agent Framework Agent for summarisation (AZURE_OPENAI_DEPLOYMENT_NAME)
   - Azure OpenAI Embeddings API for vectorisation (AZURE_OPENAI_EMBEDDING_DEPLOYMENT_NAME)
 """
 
@@ -17,7 +17,7 @@ from pathlib import Path
 from typing import Any
 
 import jinja2
-from agent_framework import ChatAgent, AgentThread, ChatMessageStore
+from agent_framework import Agent, AgentSession
 from agent_framework.azure import AzureOpenAIChatClient
 from azure.identity import DefaultAzureCredential, get_bearer_token_provider
 from openai import AsyncAzureOpenAI
@@ -51,10 +51,10 @@ class MemoryAgent:
         openai_endpoint: str | None = None,
     ):
         # Summariser agent
-        self._summarizer = ChatAgent(
+        self._summarizer = Agent(
             name="MemorySummarizer",
             instructions=SUMMARIZATION_PROMPT,
-            chat_client=chat_client,
+            client=chat_client,
         )
 
         # Embedding client (uses the Azure OpenAI Python SDK directly)
@@ -90,7 +90,7 @@ class MemoryAgent:
         # Step 1 — build a textual representation of the conversation
         conversation_text = self._format_conversation(conversation_messages, title)
 
-        # Step 2 — summarise via ChatAgent
+        # Step 2 — summarise via Agent
         summary = await self._summarize(conversation_text)
 
         # Step 3 — embed the summary
@@ -134,12 +134,13 @@ class MemoryAgent:
 
     async def _summarize(self, conversation_text: str) -> str:
         """Run the summariser agent and return the summary text."""
-        thread = AgentThread(message_store=ChatMessageStore(messages=[]))
+        session = AgentSession()
 
         full_text: list[str] = []
-        async for update in self._summarizer.run_stream(
+        async for update in self._summarizer.run(
             f"Summarise the following conversation:\n\n{conversation_text}",
-            thread=thread,
+            stream=True,
+            session=session,
         ):
             if update.text:
                 full_text.append(update.text)
