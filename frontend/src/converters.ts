@@ -79,14 +79,25 @@ export function convertToolResult(
   surfaceId: string,
 ): A2UIMessage[] | null {
   const converter = converters.get(toolName);
-  if (!converter) return null;
-
-  try {
-    const data = JSON.parse(resultJson);
-    return converter(data, surfaceId);
-  } catch {
-    return null;
+  if (converter) {
+    try {
+      const data = JSON.parse(resultJson);
+      return converter(data, surfaceId);
+    } catch {
+      return null;
+    }
   }
+
+  // Try RAG citations format for MCP knowledge base tools
+  try {
+    const data = JSON.parse(resultJson) as Record<string, unknown>;
+    if (data && typeof data === 'object' && 'citations' in data && Array.isArray(data.citations)) {
+      const ragConverter = converters.get('do_rag');
+      if (ragConverter) return ragConverter(data, surfaceId);
+    }
+  } catch { /* not JSON or wrong shape */ }
+
+  return null;
 }
 
 /* ────────────────────────────────────────────────────────────
@@ -106,7 +117,11 @@ converters.set('get_order_status', (result: unknown, surfaceId: string): A2UIMes
 });
 
 /* ────────────────────────────────────────────────────────────
- * do_rag converter  →  RAG Citations template
+ * RAG citations converter  →  RAG Citations template
+ *
+ * Used for both classic RAG (do_classic_rag) and agentic RAG
+ * via MCP (auto-detected by {content, citations} shape in
+ * convertToolResult above).
  *
  * The backend returns { content, citations[] } where each citation has
  * search_idx, ref_id, source_name, content, and annotation.

@@ -39,6 +39,7 @@ interface ChatMessage {
   content: string;
   toolCalls: ToolCallInfo[];
   isStreaming?: boolean;
+  ragMode?: 'none' | 'agentic' | 'classic';
 }
 
 const MOCK_USERS = [
@@ -548,6 +549,29 @@ export class NativeApp extends LitElement {
       font-weight: 600;
       margin-bottom: 4px;
       color: light-dark(var(--n-10), var(--n-90));
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .rag-badge {
+      font-size: 10px;
+      font-weight: 600;
+      padding: 1px 7px;
+      border-radius: 9px;
+      letter-spacing: 0.3px;
+      text-transform: uppercase;
+    }
+    .rag-badge.agentic {
+      background: light-dark(#e0f2fe, #0c4a6e);
+      color: light-dark(#0369a1, #7dd3fc);
+    }
+    .rag-badge.classic {
+      background: light-dark(#fef3c7, #78350f);
+      color: light-dark(#92400e, #fde68a);
+    }
+    .rag-badge.none {
+      background: light-dark(#f3f4f6, #374151);
+      color: light-dark(#6b7280, #9ca3af);
     }
 
     /* No bubble — flat text like ChatGPT */
@@ -1412,8 +1436,9 @@ export class NativeApp extends LitElement {
     this.messages = [];
 
     try {
-      const history = await this.client.getSessionHistory(id);
-      this.messages = this.buildChatMessagesFromHistory(history);
+      const { messages: history, metadata } = await this.client.getSessionHistory(id);
+      const ragMode = metadata?.rag_mode as ChatMessage['ragMode'] | undefined;
+      this.messages = this.buildChatMessagesFromHistory(history, ragMode);
       this.scrollToBottom();
     } catch (err) {
       uiLogger.error('sessions.history', err, 'Unable to load this session history.');
@@ -1427,6 +1452,7 @@ export class NativeApp extends LitElement {
    */
   private buildChatMessagesFromHistory(
     history: import('./client.js').SessionHistoryMessage[],
+    ragMode?: 'none' | 'agentic' | 'classic',
   ): ChatMessage[] {
     // First pass: collect tool results keyed by call_id
     const resultsByCallId = new Map<string, { name: string; result: string }>();
@@ -1483,6 +1509,7 @@ export class NativeApp extends LitElement {
           role: m.role as 'user' | 'assistant',
           content: m.content,
           toolCalls: [],
+          ...(m.role === 'assistant' && ragMode ? { ragMode } : {}),
         };
         if (m.role === 'assistant' && pendingToolCalls.length > 0) {
           chatMsg.toolCalls = [...pendingToolCalls];
@@ -1570,7 +1597,8 @@ export class NativeApp extends LitElement {
 
     try {
       const conv = await this.client.getConversation(id);
-      const msgs = this.buildChatMessagesFromHistory(conv.messages);
+      const ragMode = conv.metadata?.rag_mode as ChatMessage['ragMode'] | undefined;
+      const msgs = this.buildChatMessagesFromHistory(conv.messages, ragMode);
       this.messages = msgs;
       this.scrollToBottom();
     } catch (err) {
@@ -1861,6 +1889,7 @@ export class NativeApp extends LitElement {
       content: '',
       toolCalls: [],
       isStreaming: true,
+      ragMode: this.ragMode,
     };
     this.messages = [...this.messages, userMsg, assistantMsg];
     this.isLoading = true;
@@ -2245,7 +2274,16 @@ export class NativeApp extends LitElement {
           </span>
         </div>
         <div class="msg-body">
-          <div class="msg-role">${msg.role === 'user' ? 'You' : 'Assistant'}</div>
+          <div class="msg-role">
+            ${msg.role === 'user' ? 'You' : 'Assistant'}
+            ${msg.role === 'assistant' && msg.ragMode
+              ? html`<span class="rag-badge ${msg.ragMode}">${
+                  msg.ragMode === 'agentic' ? 'Agentic RAG'
+                  : msg.ragMode === 'classic' ? 'Classic RAG'
+                  : 'RAG Off'
+                }</span>`
+              : nothing}
+          </div>
 
           <!-- Tool calls (rendered as A2UI surfaces) -->
           ${msg.toolCalls.map(tc => this.renderToolCall(tc))}

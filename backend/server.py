@@ -38,7 +38,7 @@ from classic_rag_client import ClassicRAGClient
 from conversation_history import ConversationHistoryStore
 from conversation_memory import ConversationMemoryStore
 from memory_agent import MemoryAgent
-from rag_client import RAGClient
+from rag_client import create_rag_mcp_tool
 from user_profile_memory import UserProfileMemoryStore
 from profile_agent import ProfileAgent
 from agent_tools import AgentTools
@@ -261,8 +261,8 @@ memory_store = ConversationMemoryStore()
 # Initialize the user profile memory store (Cosmos DB)
 profile_store = UserProfileMemoryStore()
 
-# Initialize the RAG client (Azure AI Search knowledge base)
-rag_client = RAGClient()
+# Initialize the RAG MCP tool (Azure AI Search knowledge base via MCP)
+rag_mcp_tool = create_rag_mcp_tool()
 
 # Initialize the classic RAG client (Azure AI Search standard hybrid search)
 classic_rag_client = ClassicRAGClient()
@@ -301,7 +301,7 @@ agent_tools = AgentTools(
     memory_store=memory_store,
     memory_agent=memory_agent,
     profile_store=profile_store,
-    rag_client=rag_client,
+    rag_mcp_tool=rag_mcp_tool,
     classic_rag_client=classic_rag_client,
 )
 
@@ -360,10 +360,16 @@ async def lifespan(app: FastAPI):
     logger.info("Conversation memory store initialized (PostgreSQL)")
     await profile_store.initialize()
     logger.info("User profile memory store initialized (Cosmos DB)")
-    
+
+    # Connect the MCP RAG tool (establishes MCP session with Azure AI Search)
+    await rag_mcp_tool.connect()
+    logger.info("RAG MCP tool connected (Azure AI Search knowledge base)")
+
     yield
-    
-    # Shutdown: Close Cosmos DB and PostgreSQL clients
+
+    # Shutdown: Close MCP tool and data stores
+    await rag_mcp_tool.close()
+    logger.info("RAG MCP tool disconnected")
     await conversation_store.close()
     logger.info("Conversation history store closed")
     await memory_store.close()
@@ -525,7 +531,11 @@ async def get_session_history(
     doc = await conversation_store.get_conversation(session_id, current_user.user_id)
     if doc is None:
         raise HTTPException(status_code=404, detail="Session not found")
-    return {"session_id": session_id, "messages": doc.get("messages", [])}
+    return {
+        "session_id": session_id,
+        "messages": doc.get("messages", []),
+        "metadata": doc.get("metadata", {}),
+    }
 
 
 @app.put("/sessions/{session_id}", response_model=SessionInfo)
@@ -1113,6 +1123,7 @@ async def _persist_turn(
     user_message: str,
     assistant_message: str,
     title: str | None,
+    rag_mode: str | None = None,
 ) -> None:
     """Append the latest user+assistant turn to the Cosmos DB conversation."""
     try:
@@ -1126,6 +1137,8 @@ async def _persist_turn(
             "api": "responses",
             "store": False,
         }
+        if rag_mode:
+            metadata["rag_mode"] = rag_mode
 
         # Fetch existing conversation to append
         existing = await conversation_store.get_conversation(session_id, user_id)
@@ -1155,6 +1168,7 @@ async def stream_agent_response(
     session_id: str,
     user_id: str,
     personalized_agent: Agent | None = None,
+    rag_mode: str | None = None,
 ) -> AsyncIterator[str]:
     """
     Stream agent response using AG-UI protocol.
@@ -1245,7 +1259,7 @@ async def stream_agent_response(
         # Track message count and persist the turn to Cosmos DB
         session_manager.increment_message_count(session_id)
         session_title = session_manager._session_metadata.get(session_id, {}).get("title")
-        await _persist_turn(session_id, user_id, user_message, assistant_text, session_title)
+        await _persist_turn(session_id, user_id, user_message, assistant_text, session_title, rag_mode=rag_mode)
 
     except Exception as e:
         logger.error("[OUT] session=%s run=%s event=RUN_ERROR error=%s", session_id, run_id, str(e), exc_info=True)
@@ -1306,7 +1320,7 @@ async def chat(
     personalized = _build_personalized_agent(user_profile, rag_mode=rag_mode)
 
     return StreamingResponse(
-        stream_agent_response(user_message, session, session_id, current_user.user_id, personalized),
+        stream_agent_response(user_message, session, session_id, current_user.user_id, personalized, rag_mode=rag_mode),
         media_type="text/event-stream",
         headers={
             "Cache-Control": "no-cache",

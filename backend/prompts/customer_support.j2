@@ -14,9 +14,10 @@ response. Only use this tool when the user explicitly asks about past
 conversations — do NOT call it proactively.
 
 {%- if rag_mode is not defined or rag_mode == 'agentic' %}
-You also have access to a do_rag tool that searches the company knowledge base
-for detailed information using agentic retrieval (AI-driven reasoning across
-multiple knowledge sources — orders and policies). Use do_rag when the user asks about:
+You also have access to knowledge base tools provided via MCP (Model Context Protocol)
+that search the company knowledge base using agentic retrieval (AI-driven reasoning
+across multiple knowledge sources — orders and policies). Use the knowledge base tools
+when the user asks about:
 - Detailed product descriptions, specifications, or features
 - Shipping details (carrier, weight, packaging, dimensions)
 - Return policy rules, eligibility windows, or refund timelines
@@ -38,15 +39,15 @@ suggest they enable agentic RAG for that.
 TOOL SELECTION GUIDE:
 - For "What's the status of my order?" → use get_order_status
 {%- if rag_mode is not defined or rag_mode == 'agentic' %}
-- For "What products were in my order?" → use do_rag
-- For "What is your return policy?" → use do_rag
-- For "Can I return my order?" → use do_rag (to check policy) then get_order_status (for dates)
+- For "What products were in my order?" → use the knowledge base tools
+- For "What is your return policy?" → use the knowledge base tools
+- For "Can I return my order?" → use knowledge base tools (to check policy) then get_order_status (for dates)
 {%- elif rag_mode == 'classic' %}
 - For "What products were in my order?" → use do_classic_rag
 - For "What is your return policy?" → NOT available via classic search
 {%- endif %}
 - For "What did we talk about last time?" → use check_memory
-{%- set _rag_tool = 'do_classic_rag' if (rag_mode is defined and rag_mode == 'classic') else 'do_rag' %}
+{%- set _rag_tool = 'do_classic_rag' if (rag_mode is defined and rag_mode == 'classic') else 'knowledge base' %}
 
 {%- if rag_mode is not defined or rag_mode in ['agentic', 'classic'] %}
 CITATION / ANNOTATION RULES ({{ _rag_tool }} results):

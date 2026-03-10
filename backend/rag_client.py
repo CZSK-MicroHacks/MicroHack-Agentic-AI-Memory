@@ -1,185 +1,151 @@
 # rag_client.py
 """
-RAG Client — Calls Azure AI Search knowledge base retrieve API for
-agentic retrieval (extractive data mode).
+RAG Client — MCP-based agentic retrieval via Azure AI Search knowledge base.
 
-Uses direct REST calls with aiohttp + DefaultAzureCredential to avoid
-depending on preview SDK versions in the production backend.
+Uses MCPStreamableHTTPTool from agent_framework to expose the knowledge base
+as MCP tools that the LLM can call directly, replacing the old REST-based
+retrieve API approach.
 """
 
 from __future__ import annotations
 
 import logging
 import os
-from dataclasses import dataclass, field
 
-import aiohttp
+import httpx
 from azure.identity import DefaultAzureCredential, get_bearer_token_provider
+from agent_framework import MCPStreamableHTTPTool
 
 logger = logging.getLogger("ag_ui.rag_client")
 
-
-@dataclass
-class RAGCitation:
-    """A single citation from the knowledge base retrieve response."""
-    content: str
-    ref_id: str
-    source_name: str
+API_VERSION = "2025-11-01-Preview"
 
 
-@dataclass
-class RAGResult:
-    """Result from the knowledge base retrieve API."""
-    content: str
-    citations: list[RAGCitation] = field(default_factory=list)
+def _parse_mcp_rag_result(result) -> str:
+    """Parse MCP tool result into {content, citations} JSON matching the classic RAG format.
+
+    The Azure AI Search MCP server returns TextContent with a JSON array of
+    {ref_id, content} objects.  We transform this into the same structure
+    the frontend converter expects for the citation card UI.
+    """
+    import json as _json
+
+    # Extract raw text from MCP CallToolResult
+    parts: list[str] = []
+    for item in result.content:
+        if hasattr(item, "text"):
+            parts.append(item.text)
+    raw = "\n".join(parts)
+
+    # Try to parse as JSON array of {ref_id, content}
+    try:
+        items = _json.loads(raw)
+    except (_json.JSONDecodeError, TypeError):
+        return _json.dumps({"content": raw, "citations": []})
+
+    if not isinstance(items, list):
+        return _json.dumps({"content": raw, "citations": []})
+
+    text_parts: list[str] = []
+    citations: list[dict] = []
+    for i, item in enumerate(items):
+        if not isinstance(item, dict):
+            continue
+        chunk = item.get("content", "")
+        ref_id = str(item.get("ref_id", ""))
+        if chunk:
+            text_parts.append(chunk)
+            source_name = _derive_source_name(chunk, ref_id)
+            citations.append({
+                "search_idx": i,
+                "ref_id": ref_id,
+                "source_name": source_name,
+                "content": chunk[:300],
+                "annotation": f"\u3010{i}:{ref_id}\u2020{source_name}\u3011",
+            })
+
+    return _json.dumps({
+        "content": "\n\n".join(text_parts),
+        "citations": citations,
+    })
 
 
-class RAGClient:
-    """Client for Azure AI Search agentic retrieval (knowledge base retrieve API)."""
+def _derive_source_name(chunk: str, ref_id: str) -> str:
+    """Derive a short source label from document content or ref_id."""
+    import re
+    first_line = chunk.strip().split("\n", 1)[0]
+    m = re.match(r"^([A-Z][^:]{2,40}):", first_line)
+    if m:
+        return m.group(1).strip()
+    if ref_id:
+        parts = str(ref_id).split("-")
+        if len(parts) >= 3 and parts[0].lower() == "ord":
+            order_num = "-".join(parts[:2]).upper()
+            label = " ".join(p.capitalize() for p in parts[2:])
+            return f"Order {order_num} {label}".strip()
+        if len(parts) >= 2 and parts[0].lower() == "policy":
+            label = " ".join(p.capitalize() for p in parts[1:])
+            return f"Policy: {label}"
+        return " ".join(p.capitalize() for p in parts)[:40]
+    return f"Source {ref_id}"
 
-    API_VERSION = "2025-11-01-Preview"
 
-    def __init__(
-        self,
-        search_endpoint: str | None = None,
-        knowledge_base_name: str | None = None,
-        credential: DefaultAzureCredential | None = None,
-    ):
-        self._endpoint = (search_endpoint or os.getenv("AZURE_SEARCH_ENDPOINT", "")).rstrip("/")
-        self._kb_name = knowledge_base_name or os.getenv("AZURE_SEARCH_KNOWLEDGE_BASE_NAME", "customer-support-kb")
-        self._credential = credential or DefaultAzureCredential()
+class _AzureSearchAuth(httpx.Auth):
+    """httpx auth that injects Azure AD Bearer tokens for Azure AI Search."""
+
+    def __init__(self, credential: DefaultAzureCredential | None = None) -> None:
         self._token_provider = get_bearer_token_provider(
-            self._credential, "https://search.azure.com/.default"
+            credential or DefaultAzureCredential(),
+            "https://search.azure.com/.default",
         )
 
-    async def retrieve(
-        self,
-        query: str,
-        conversation_history: list[dict[str, str]] | None = None,
-    ) -> RAGResult:
-        """
-        Call the knowledge base retrieve API.
+    def auth_flow(self, request: httpx.Request):
+        request.headers["Authorization"] = f"Bearer {self._token_provider()}"
+        yield request
 
-        Uses intents-based retrieval (required for minimal reasoning effort).
 
-        Args:
-            query: Natural language query
-            conversation_history: Optional list of {"role": ..., "content": ...} messages
-                (used to build additional intent context if provided)
+def create_rag_mcp_tool(
+    search_endpoint: str | None = None,
+    knowledge_base_name: str | None = None,
+    credential: DefaultAzureCredential | None = None,
+) -> MCPStreamableHTTPTool:
+    """Create an MCPStreamableHTTPTool for Azure AI Search agentic retrieval.
 
-        Returns:
-            RAGResult with content and citations
-        """
-        url = (
-            f"{self._endpoint}/knowledgebases/{self._kb_name}"
-            f"/retrieve?api-version={self.API_VERSION}"
-        )
+    The returned tool must be used as an async context manager (``async with``)
+    to establish the MCP connection before it is passed to an Agent.
 
-        # Minimal reasoning mode requires intents, not messages
-        intents = [{"type": "semantic", "search": query}]
+    Args:
+        search_endpoint: Azure AI Search endpoint URL (falls back to
+            ``AZURE_SEARCH_ENDPOINT`` env var).
+        knowledge_base_name: Knowledge base name (falls back to
+            ``AZURE_SEARCH_KNOWLEDGE_BASE_NAME`` env var).
+        credential: Azure credential for token acquisition.
 
-        payload = {"intents": intents}
+    Returns:
+        An MCPStreamableHTTPTool ready to be connected.
+    """
+    endpoint = (search_endpoint or os.getenv("AZURE_SEARCH_ENDPOINT", "")).rstrip("/")
+    kb_name = knowledge_base_name or os.getenv(
+        "AZURE_SEARCH_KNOWLEDGE_BASE_NAME", "customer-support-kb"
+    )
 
-        token = self._token_provider()
-        headers = {
-            "Authorization": f"Bearer {token}",
-            "Content-Type": "application/json",
-        }
+    url = f"{endpoint}/knowledgebases/{kb_name}/mcp?api-version={API_VERSION}"
 
-        logger.info("RAG retrieve: kb=%s query=%s", self._kb_name, query[:100])
+    cred = credential or DefaultAzureCredential()
+    auth = _AzureSearchAuth(cred)
+    http_client = httpx.AsyncClient(auth=auth)
 
-        async with aiohttp.ClientSession() as session:
-            async with session.post(url, json=payload, headers=headers) as resp:
-                if resp.status != 200:
-                    body = await resp.text()
-                    logger.error("RAG retrieve failed: status=%d body=%s", resp.status, body[:500])
-                    return RAGResult(content=f"Knowledge base query failed (HTTP {resp.status})")
+    logger.info("Creating MCP RAG tool: url=%s", url)
 
-                data = await resp.json()
-
-        return self._parse_response(data)
-
-    def _parse_response(self, data: dict) -> RAGResult:
-        """Parse the knowledge base retrieve API response.
-
-        The response text is a JSON array of {ref_id, content} objects.
-        We flatten them into a single content string with citations.
-        """
-        import json as _json
-
-        response_list = data.get("response", [])
-        citations: list[RAGCitation] = []
-        text_parts: list[str] = []
-        seen_ref_ids: set[str] = set()
-
-        for resp_item in response_list:
-            if not isinstance(resp_item, dict):
-                continue
-            for content_part in resp_item.get("content", []):
-                if not isinstance(content_part, dict) or content_part.get("type") != "text":
-                    continue
-                raw = content_part.get("text", "")
-                if not raw or raw == "[]":
-                    continue
-
-                # The text is a JSON array of {ref_id, content} objects
-                try:
-                    items = _json.loads(raw)
-                    if isinstance(items, list):
-                        for item in items:
-                            chunk = item.get("content", "")
-                            ref_id = str(item.get("ref_id", ""))
-                            if chunk:
-                                text_parts.append(chunk)
-                                if ref_id and ref_id not in seen_ref_ids:
-                                    seen_ref_ids.add(ref_id)
-                                    # Derive a short source label from the content
-                                    source_name = self._derive_source_name(chunk, ref_id)
-                                    citations.append(
-                                        RAGCitation(
-                                            content=chunk[:300],
-                                            ref_id=ref_id,
-                                            source_name=source_name,
-                                        )
-                                    )
-                    else:
-                        text_parts.append(raw)
-                except (_json.JSONDecodeError, TypeError):
-                    text_parts.append(raw)
-
-        content = "\n\n".join(text_parts)
-        logger.info("RAG result: content_len=%d citations=%d", len(content), len(citations))
-        return RAGResult(content=content, citations=citations)
-
-    @staticmethod
-    def _derive_source_name(chunk: str, ref_id: str) -> str:
-        """Derive a short, meaningful source label from document content.
-
-        Strategy:
-        1. If the chunk starts with a title pattern like "Some Title:", use that.
-        2. Otherwise fall back to a cleaned-up version of the ref_id.
-        """
-        import re
-
-        # Check for "Title:" pattern at the start of the content
-        first_line = chunk.strip().split("\n", 1)[0]
-        m = re.match(r"^([A-Z][^:]{2,40}):", first_line)
-        if m:
-            return m.group(1).strip()
-
-        # Fall back to humanised ref_id  (e.g. "ord-001-shipping" → "Order ORD-001 Shipping")
-        if ref_id:
-            parts = ref_id.split("-")
-            # Handle order-style IDs like "ord-001-shipping"
-            if len(parts) >= 3 and parts[0].lower() == "ord":
-                order_num = "-".join(parts[:2]).upper()
-                label = " ".join(p.capitalize() for p in parts[2:])
-                return f"Order {order_num} {label}".strip()
-            # Handle policy-style IDs like "policy-eligibility"
-            if len(parts) >= 2 and parts[0].lower() == "policy":
-                label = " ".join(p.capitalize() for p in parts[1:])
-                return f"Policy: {label}"
-            # Generic fallback: capitalize parts
-            return " ".join(p.capitalize() for p in parts)[:40]
-
-        return f"Source {ref_id}"
+    return MCPStreamableHTTPTool(
+        name="knowledge_base",
+        url=url,
+        description=(
+            "Search the company knowledge base for detailed information "
+            "about orders, products, shipping, and return/refund policies."
+        ),
+        http_client=http_client,
+        approval_mode="never_require",
+        load_prompts=False,
+        parse_tool_results=_parse_mcp_rag_result,
+    )

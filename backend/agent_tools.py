@@ -14,12 +14,11 @@ from typing import Annotated, Any
 
 from pydantic import Field
 
-from agent_framework import tool
+from agent_framework import tool, MCPStreamableHTTPTool
 
 from classic_rag_client import ClassicRAGClient
 from conversation_memory import ConversationMemoryStore
 from memory_agent import MemoryAgent
-from rag_client import RAGClient
 from user_profile_memory import UserProfileMemoryStore
 
 logger = logging.getLogger("ag_ui.agent_tools")
@@ -52,7 +51,7 @@ class AgentTools:
 
     Usage::
 
-        tools = AgentTools(memory_store, memory_agent, profile_store, rag_client)
+        tools = AgentTools(memory_store, memory_agent, profile_store, rag_mcp_tool, classic_rag_client)
         # Pass bound methods as tools:
         agent = Agent(..., tools=tools.all)
         # Before each agent run:
@@ -64,13 +63,13 @@ class AgentTools:
         memory_store: ConversationMemoryStore,
         memory_agent: MemoryAgent,
         profile_store: UserProfileMemoryStore,
-        rag_client: RAGClient,
+        rag_mcp_tool: MCPStreamableHTTPTool,
         classic_rag_client: ClassicRAGClient,
     ) -> None:
         self._memory_store = memory_store
         self._memory_agent = memory_agent
         self._profile_store = profile_store
-        self._rag_client = rag_client
+        self._rag_mcp_tool = rag_mcp_tool
         self._classic_rag_client = classic_rag_client
         self._current_user_id: contextvars.ContextVar[str] = contextvars.ContextVar(
             "_current_user_id"
@@ -146,48 +145,6 @@ class AgentTools:
             "trackingNumber": f"Tracking: {raw['tracking']}" if raw.get("tracking") else "Tracking: N/A",
             "currentStepIcon": _STATUS_ICONS.get(raw["status"], "help"),
             "eta": f"Estimated delivery: {raw['eta']}" if raw.get("eta") else "",
-        }
-
-    @tool
-    async def do_rag(
-        self,
-        query: Annotated[str, Field(description="Natural-language question to search the knowledge base for")],
-    ) -> dict:
-        """Search the company knowledge base for detailed information about orders,
-        products, shipping, and return/refund policies.
-
-        Use this tool when you need:
-        - Detailed product specifications or descriptions
-        - Shipping carrier, weight, or packaging information
-        - Return policy rules, eligibility windows, or refund timelines
-        - Any information beyond the basic order status
-
-        Do NOT use this tool for a simple order status check — use
-        get_order_status for that instead.
-        """
-        logger.info("Running do_rag tool with query: %s", query)
-        try:
-            result = await self._rag_client.retrieve(query=query)
-        except Exception as e:
-            logger.error("do_rag tool failed: %s", e, exc_info=True)
-            return {"content": f"Knowledge base search failed: {e}", "citations": []}
-
-        if not result.content and not result.citations:
-            return {"content": "No relevant information found in the knowledge base.", "citations": []}
-
-        citations_list = []
-        for i, cit in enumerate(result.citations):
-            citations_list.append({
-                "search_idx": i,
-                "ref_id": cit.ref_id,
-                "source_name": cit.source_name,
-                "content": cit.content,
-                "annotation": f"\u3010{i}:{cit.ref_id}\u2020{cit.source_name}\u3011",
-            })
-
-        return {
-            "content": result.content,
-            "citations": citations_list,
         }
 
     @tool
@@ -322,14 +279,14 @@ class AgentTools:
 
     @property
     def all(self) -> list:
-        """All tools including agentic RAG."""
-        return [self.get_order_status, self.check_memory, self.do_rag, self.update_user_profile]
+        """All tools including agentic RAG via MCP."""
+        return [self.get_order_status, self.check_memory, self._rag_mcp_tool, self.update_user_profile]
 
     def for_rag_mode(self, rag_mode: str) -> list:
         """Return tool list for the given RAG mode."""
         base = [self.get_order_status, self.check_memory, self.update_user_profile]
         if rag_mode == "agentic":
-            return base + [self.do_rag]
+            return base + [self._rag_mcp_tool]
         elif rag_mode == "classic":
             return base + [self.do_classic_rag]
         return base  # "none"

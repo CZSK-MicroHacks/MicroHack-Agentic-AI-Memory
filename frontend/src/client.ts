@@ -45,6 +45,11 @@ export interface SessionHistoryMessage {
   tool_results?: ToolResultRecord[];
 }
 
+export interface SessionHistoryResult {
+  messages: SessionHistoryMessage[];
+  metadata: Record<string, unknown>;
+}
+
 export interface ConversationSummary {
   id: string;
   user_id: string;
@@ -191,14 +196,14 @@ export class AGUIClient {
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
   }
 
-  async getSessionHistory(sessionId: string): Promise<SessionHistoryMessage[]> {
+  async getSessionHistory(sessionId: string): Promise<SessionHistoryResult> {
     const authHeaders = await this.authHeaders();
     const res = await fetch(`${this.baseUrl}/sessions/${sessionId}/history`, {
       headers: { ...authHeaders },
     });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const data = await res.json();
-    return data.messages ?? [];
+    return { messages: data.messages ?? [], metadata: data.metadata ?? {} };
   }
 
   /* ── Conversation History (Cosmos DB) ────────────────── */
