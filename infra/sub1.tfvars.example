@@ -1,0 +1,16 @@
+# Starter workshop configuration
+
+n = 4
+
+locations = ["swedencentral", "germanywestcentral", "francecentral"]
+
+subscription_id = "673af34d-6b28-41dc-bc7b-f507418045e6"
+
+entra_user_domain = "tkubica.net"
+entra_user_group  = "microhack-users"
+
+project_name = "mhaimem"
+
+# Paswords - confidential
+entra_user_password     = "somepassword"
+postgres_admin_password = "somepassword"

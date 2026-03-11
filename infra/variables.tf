@@ -1,33 +1,72 @@
-# -----------------------------------------------------------------------------
-# Core Variables
-# -----------------------------------------------------------------------------
+variable "n" {
+  type        = number
+  default     = 4
+  description = <<EOT
+Number of student seats to provision.
+Each seat creates its own resource group and a full copy of the Azure application stack through the user_seat module.
+EOT
+
+  validation {
+    condition     = var.n >= 1
+    error_message = "n must be at least 1."
+  }
+}
+
+variable "entra_user_domain" {
+  type        = string
+  default     = "tkubica.net"
+  description = <<EOT
+Domain appended to generated Entra user principal names.
+Users are created as userNNN@domain, for example user001@tkubica.net.
+EOT
+}
+
+variable "entra_user_password" {
+  type        = string
+  sensitive   = true
+  default     = ""
+  description = <<EOT
+Password assigned to all generated Entra users for the workshop.
+Set this through TF_VAR_entra_user_password or a non-committed tfvars file before apply.
+EOT
+}
+
+variable "entra_user_group" {
+  type        = string
+  default     = "microhack-users"
+  description = "Display name of the Entra group that contains all workshop users."
+}
 
 variable "subscription_id" {
-  description = "Azure subscription ID"
   type        = string
+  description = <<EOT
+Azure subscription ID used for all seat deployments and subscription-level RBAC.
+Provide this through tfvars, CLI input, or TF_VAR_subscription_id.
+EOT
 }
 
-variable "resource_group_name" {
-  description = "Name of the resource group"
-  type        = string
-  default     = "rg-mh-ai-memory"
-}
+variable "locations" {
+  type        = list(string)
+  description = <<EOT
+List of Azure regions used for seat placement.
+Seats are distributed across the list in round-robin order.
+EOT
 
-variable "location" {
-  description = "Azure region for all resources"
-  type        = string
-  default     = "eastus2"
+  validation {
+    condition     = length(var.locations) > 0 && alltrue([for location in var.locations : length(trimspace(location)) > 0])
+    error_message = "Provide at least one non-empty Azure region in locations."
+  }
 }
 
 variable "project_name" {
-  description = "Short project name used as naming prefix"
   type        = string
   default     = "mhaimem"
+  description = "Short alphanumeric prefix used when naming per-seat Azure resources."
 }
 
 variable "tags" {
-  description = "Tags to apply to all resources"
   type        = map(string)
+  description = "Base tags applied to all seat resources."
   default = {
     project     = "ag-ui-demo"
     environment = "dev"
@@ -35,14 +74,10 @@ variable "tags" {
   }
 }
 
-# -----------------------------------------------------------------------------
-# Entra ID Authentication
-# -----------------------------------------------------------------------------
-
 variable "auth_mode" {
-  description = "Authentication mode for deployed applications (entra or mock)."
   type        = string
   default     = "entra"
+  description = "Authentication mode injected into each deployed frontend and backend application."
 
   validation {
     condition     = contains(["entra", "mock"], lower(var.auth_mode))
@@ -50,122 +85,107 @@ variable "auth_mode" {
   }
 }
 
-variable "frontend_additional_redirect_uris" {
-  description = "Additional redirect URIs for the frontend SPA app registration."
-  type        = list(string)
-  default     = []
-}
-
 variable "frontend_redirect_uri" {
-  description = "Primary frontend redirect URI for Entra SPA registration (e.g. ACA frontend FQDN)."
   type        = string
   default     = ""
+  description = <<EOT
+Primary redirect URI for the shared frontend SPA registration.
+Use this to add a known frontend URL in addition to localhost before or after deployment.
+EOT
+}
+
+variable "frontend_additional_redirect_uris" {
+  type        = list(string)
+  default     = []
+  description = "Additional redirect URIs for the shared frontend SPA app registration."
 }
 
 variable "frontend_additional_post_logout_redirect_uris" {
-  description = "Additional post-logout redirect URIs for the frontend SPA app registration."
   type        = list(string)
   default     = []
+  description = "Additional post-logout redirect URIs for the shared frontend SPA app registration."
 }
 
-# -----------------------------------------------------------------------------
-# PostgreSQL
-# -----------------------------------------------------------------------------
-
 variable "postgres_location" {
-  description = "Azure region for PostgreSQL (if restricted in primary location)"
   type        = string
-  default     = "westus2"
+  default     = ""
+  description = "Optional override for PostgreSQL Flexible Server region; leave empty to use the seat's configured seat region."
 }
 
 variable "postgres_admin_login" {
-  description = "PostgreSQL administrator login"
   type        = string
   default     = "pgadmin"
+  description = "Administrator login name for each seat's PostgreSQL Flexible Server."
 }
 
 variable "postgres_admin_password" {
-  description = "PostgreSQL administrator password"
   type        = string
   sensitive   = true
+  description = "Administrator password for each seat's PostgreSQL Flexible Server."
 }
 
 variable "postgres_sku" {
-  description = "PostgreSQL Flexible Server SKU"
   type        = string
   default     = "B_Standard_B1ms"
+  description = "SKU name for each seat's PostgreSQL Flexible Server."
 }
 
 variable "postgres_storage_mb" {
-  description = "PostgreSQL storage in MB"
   type        = number
   default     = 32768
+  description = "Allocated storage size in MB for each seat's PostgreSQL Flexible Server."
 }
 
 variable "postgres_version" {
-  description = "PostgreSQL major version"
   type        = string
   default     = "16"
+  description = "Major PostgreSQL version used for each seat."
 }
 
 variable "postgres_password_auth_enabled" {
-  description = "Whether PostgreSQL password authentication remains enabled (set false after managed identity cutover)."
   type        = bool
   default     = true
+  description = "Whether password authentication remains enabled on each seat's PostgreSQL server."
 }
 
 variable "client_ip" {
-  description = "Client IP address to allow through the PostgreSQL firewall for development access."
   type        = string
   default     = ""
+  description = "Optional client IP allowed through the PostgreSQL firewall for direct development access."
 }
 
-
-
-# -----------------------------------------------------------------------------
-# Azure AI Search
-# -----------------------------------------------------------------------------
-
 variable "search_sku" {
-  description = "Azure AI Search SKU (standard required for semantic ranker / agentic retrieval)"
   type        = string
   default     = "standard"
+  description = "Azure AI Search SKU used for each seat deployment."
 }
 
 variable "search_location" {
-  description = "Azure region for AI Search (may differ from primary location due to capacity)"
   type        = string
-  default     = "westus2"
+  default     = ""
+  description = "Optional override for Azure AI Search region; leave empty to use the seat's configured seat region."
 }
-
-# -----------------------------------------------------------------------------
-# Cosmos DB
-# -----------------------------------------------------------------------------
 
 variable "cosmosdb_throughput" {
-  description = "Cosmos DB provisioned throughput (RU/s)"
   type        = number
   default     = 400
+  description = "Provisioned Cosmos DB throughput in RU/s for each seat."
 }
 
-# -----------------------------------------------------------------------------
-# Redis
-# -----------------------------------------------------------------------------
-
 variable "redis_sku" {
-  description = "Redis Cache SKU name"
   type        = string
   default     = "Basic"
+  description = "Azure Cache for Redis SKU used for each seat."
 }
 
 variable "redis_family" {
-  description = "Redis Cache family"
   type        = string
   default     = "C"
+  description = "Azure Cache for Redis family used for each seat."
 }
 
 variable "redis_capacity" {
-  description = "Redis Cache capacity (size)"
   type        = number
   default     = 0
+  description = "Azure Cache for Redis capacity for each seat."
 }
