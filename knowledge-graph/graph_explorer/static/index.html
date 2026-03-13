@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Knowledge Graph Explorer</title>
+  <link rel="stylesheet" href="/static/styles.css">
+  <script defer src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
+  <script defer src="/static/app.js"></script>
+</head>
+<body>
+  <header class="page-header">
+    <div>
+      <h1>Knowledge Graph Explorer</h1>
+      <p>Explore neighborhoods, follow paths, and inspect the Cypher behind each graph action.</p>
+    </div>
+    <div id="status-banner" class="status-banner">Loading examples…</div>
+  </header>
+
+  <main class="layout">
+    <aside class="sidebar controls">
+      <section class="panel">
+        <h2>Explore a node</h2>
+        <label>
+          Search by name
+          <div class="inline-row">
+            <input id="search-input" type="text" placeholder="Warfarin">
+            <button id="search-button" type="button">Search</button>
+          </div>
+        </label>
+        <div id="search-results" class="result-list"></div>
+      </section>
+
+      <section class="panel">
+        <label>
+          Node name
+          <input id="node-input" type="text" placeholder="Pick a node from the search results">
+        </label>
+        <div class="inline-row">
+          <label>
+            Depth
+            <select id="depth-select">
+              <option value="1">1 hop</option>
+              <option value="2">2 hops</option>
+              <option value="3">3 hops</option>
+            </select>
+          </label>
+          <label class="grow">
+            Relationship filter
+            <select id="relationship-select">
+              <option value="">All relationships</option>
+            </select>
+          </label>
+        </div>
+        <button id="explore-button" type="button" class="primary">Load neighborhood</button>
+      </section>
+
+      <section class="panel">
+        <h2>Examples</h2>
+        <div id="example-buttons" class="example-buttons"></div>
+      </section>
+    </aside>
+
+    <section class="graph-column">
+      <section class="panel graph-panel">
+        <div class="panel-heading">
+          <h2>Interactive graph</h2>
+          <div class="legend">
+            <span class="legend-item drug">Drug</span>
+            <span class="legend-item disease">Disease</span>
+            <span class="legend-item gene">Gene</span>
+            <span class="legend-item symptom">Symptom</span>
+            <span class="legend-item pathway">Pathway</span>
+            <span class="legend-item concept">Concept</span>
+          </div>
+        </div>
+        <div id="graph"></div>
+      </section>
+
+      <section class="panel">
+        <h2>Cypher used</h2>
+        <p class="hint">Every graph action shows the exact Cypher queries used so students can learn by example.</p>
+        <pre id="cypher-output">Run a graph action to see Cypher here.</pre>
+      </section>
+    </section>
+
+    <aside class="sidebar">
+      <section class="panel">
+        <h2>Selected node</h2>
+        <div id="node-details" class="details-card">
+          <p>Select a node in the graph to inspect it here.</p>
+        </div>
+        <button id="follow-selected-button" type="button" disabled>Explore selected node</button>
+      </section>
+    </aside>
+  </main>
+</body>
+</html>

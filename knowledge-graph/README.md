@@ -154,7 +154,7 @@ The agent's tool call trace is displayed in both the interactive agent and the c
 The PostgreSQL Flexible Server is deployed via Terraform in the `infra/` directory with:
 - `azure.extensions`: AGE, VECTOR
 - `shared_preload_libraries`: age
-- Firewall rules for Azure services and your client IP
+- Firewall rules that let your client reach the server
 
 Ensure the server is running:
 ```bash
@@ -168,75 +168,98 @@ cp .env.example .env
 # Edit .env with your Azure PostgreSQL and OpenAI endpoints
 ```
 
-### 3. Install Dependencies
+You do not need a separate `uv sync` step unless you prefer it. Every `uv run ...` command below will create or update the Python environment if needed.
+
+### 3. Initialize the Database
+
+The SQL scripts in `init/` install the required extensions and recreate the relational + graph structures used by the challenge:
+- install `vector` and `age`
+- recreate the `nodes` table and indexes
+- recreate the AGE `biomedical` graph
+
+The recommended path is the Python helper, which loads `init/*.sql` in numeric order (`001_`, `002_`, `003_`, ...) and prints each step as it runs:
 
 ```bash
-uv sync
+uv run python init_database.py
 ```
 
-### 4. Initialize Database Schema
+If you prefer, you can still run the same SQL files yourself with `psql`:
 
-Connect to Azure PostgreSQL and run the init scripts:
 ```bash
-# Using psql or any PostgreSQL client against your Azure endpoint
 psql "host=<server>.postgres.database.azure.com port=5432 dbname=appdb user=pgadmin sslmode=require" -f init/001_extensions.sql
 psql "host=<server>.postgres.database.azure.com port=5432 dbname=appdb user=pgadmin sslmode=require" -f init/002_nodes_table.sql
 psql "host=<server>.postgres.database.azure.com port=5432 dbname=appdb user=pgadmin sslmode=require" -f init/003_age_graph.sql
 ```
 
-### 5. Generate & Load Data
+> [!NOTE]
+> Re-running initialization resets the `nodes` table and recreates the `biomedical` graph, so use it before reloading data.
+
+### 4. (Optional) Generate the Data
+
+The `data/` folder already contains generated entities, relationships, and concepts for students. You can skip this step unless you want to regenerate the dataset yourself.
 
 ```bash
-cd scripts
-
-# Generate entities, relationships (with enrichment), and concepts using LLM
-uv run python generate_entities.py
-uv run python generate_relationships.py   # Phase 1: initial + Phase 2: enrichment batches
-uv run python generate_concepts.py
-
-# Load into Azure PostgreSQL (computes embeddings + populates AGE graph)
-uv run python load_nodes.py
-uv run python load_graph.py
+uv run python scripts/generate_entities.py
+uv run python scripts/generate_relationships.py
+uv run python scripts/generate_concepts.py
 ```
 
-### 6. Run Tests
+### 5. Load the Data
+
+Load the provided or regenerated JSON data into PostgreSQL. This computes embeddings, inserts nodes, and then builds the AGE graph edges.
 
 ```bash
+uv run python scripts/load_nodes.py
+uv run python scripts/load_graph.py
+```
+
+### 6. Explore and Test the Solution
+
+#### Recommended: graphical comparison demo (web UI)
+
+```bash
+cd web
+npm install
+npm run build
 cd ..
+uv run python api_server.py
+```
+
+Open http://localhost:8080 in your browser. This is the easiest way to compare RAG-only retrieval against the agentic graph workflow side by side.
+
+![](/images/knowledge-graph.png)
+
+#### Standalone graph explorer
+
+Use the standalone explorer to inspect graph structure directly, click nodes, follow neighborhoods or paths, and see the Cypher used for each action:
+
+```bash
+uv run python -m graph_explorer
+```
+
+Open http://127.0.0.1:8091 in your browser. The explorer is self-contained under `graph_explorer/`, reads its PostgreSQL settings from `.env`, and can be removed without affecting the rest of the challenge.
+
+#### Pytest test suite
+
+```bash
 uv run python -m pytest tests/ -v
 ```
 
-Expected: 31 tests passing across search, graph, tools, and comparison test files.
-
-### 7. Run the Comparison Demo
+#### CLI comparison demo
 
 ```bash
 uv run python comparison_demo.py
 ```
 
-Shows 5 curated questions answered by RAG-only (single hybrid search) vs the agentic graph agent (LLM-driven multi-tool exploration). Each question includes tool call traces showing how the agent autonomously decided what to search and traverse.
+This runs the same five curated questions in the terminal and prints tool traces for both approaches.
 
-### 8. Run the Interactive Agent
+#### Interactive agent
 
 ```bash
 uv run python agent.py
 ```
 
-Type questions or `examples` to see sample queries. The agent uses **OpenAI function-calling** to autonomously decide which tools to invoke — it discovers relationships, expands communities, and finds shared connections without being told which edges to follow.
-
-### 9. Run the Graphical Comparison Demo (Web UI)
-
-```bash
-# Build the frontend (one-time)
-cd web && npm install && npm run build && npm run dev
-
-# Start the API server (serves both API and frontend)
-uv run python api_server.py
-```
-
-Open http://localhost:8080 in your browser. Select any of the 5 curated questions to see a side-by-side comparison of RAG-only vs agentic graph search, complete with tool call traces.
-
-![](/images/knowledge-graph.png)
+Type questions or `examples` to see sample prompts. The agent uses OpenAI function-calling to decide which graph and search tools to invoke.
 
 ## File Structure
 
@@ -245,55 +268,37 @@ knowledge-graph/
 ├── pyproject.toml              # Python dependencies
 ├── .env.example                # Config template
 ├── init/
-│   ├── 001_extensions.sql      # CREATE EXTENSION vector, age
-│   ├── 002_nodes_table.sql     # nodes table + indexes
-│   └── 003_age_graph.sql       # CREATE graph 'biomedical'
+│   ├── 001_extensions.sql      # Install required PostgreSQL extensions
+│   ├── 002_nodes_table.sql     # Recreate nodes table + indexes
+│   └── 003_age_graph.sql       # Recreate AGE graph 'biomedical'
+├── graph_explorer/
+│   ├── __main__.py             # Launch standalone explorer with uvicorn
+│   ├── app.py                  # FastAPI app + HTTP endpoints
+│   ├── service.py              # DB access + graph shaping for the explorer
+│   └── static/                 # Self-contained HTML/CSS/JS frontend
 ├── scripts/
 │   ├── helpers.py              # Shared: OpenAI client, embeddings, JSON I/O
-│   ├── generate_entities.py    # LLM generates 57 biomedical entities
-│   ├── generate_relationships.py   # LLM generates relationships (Phase 1 + Phase 2 enrichment)
-│   ├── generate_concepts.py    # LLM generates 9 community/concept nodes
+│   ├── generate_entities.py    # LLM generates biomedical entities
+│   ├── generate_relationships.py   # LLM generates relationships + enrichment
+│   ├── generate_concepts.py    # LLM generates community/concept nodes
 │   ├── load_nodes.py           # Compute embeddings, insert into nodes table
 │   └── load_graph.py           # Create AGE vertices + edges + community links
 ├── src/
 │   ├── db.py                   # Async PG pool (auto-recreates per event loop)
-│   ├── search.py               # semantic_search, keyword_search, hybrid_search (RRF)
+│   ├── search.py               # semantic_search, keyword_search, hybrid_search
 │   ├── graph.py                # AGE Cypher: neighbors, shared, expand, similar
 │   └── tools.py                # Agent tools wrapping search + graph
 ├── tests/
-│   ├── test_search.py          # 7 tests: semantic, keyword, hybrid
-│   ├── test_graph.py           # 8 tests: neighbors, shared, expand, similar
-│   ├── test_tools.py           # 10 tests: all tool functions
-│   └── test_comparison.py      # 6 tests: graph search beats RAG
-├── data/                       # Generated JSON (entities, relationships, concepts)
+│   ├── test_search.py
+│   ├── test_graph.py
+│   ├── test_tools.py
+│   └── test_comparison.py
+├── data/                       # Provided/generated JSON inputs for the lab
+├── init_database.py            # Runs init SQL files in numeric order
 ├── agent.py                    # Truly agentic CLI (OpenAI function-calling loop)
-├── comparison_demo.py          # RAG-only vs agentic graph side-by-side demo (CLI)
-├── api_server.py               # FastAPI backend for graphical comparison demo
-├── web/                        # React + Tailwind frontend for graphical demo
+├── comparison_demo.py          # RAG-only vs agentic graph side-by-side demo
+├── api_server.py               # FastAPI backend for the comparison web UI
+├── web/                        # React frontend for the comparison web UI
 └── README.md                   # This file
 ```
 
-## Key Design Decisions
-
-| Decision | Rationale |
-|----------|-----------|
-| Single `nodes` table with `node_type` column | Simpler indexing, uniform hybrid search, one set of indexes to maintain |
-| HNSW index (not IVFFlat) | pgvector's IVFFlat caps at 2000 dims; HNSW supports our 1536-dim vectors |
-| 1536-dim embeddings | `text-embedding-3-large` supports dimension reduction; 1536 fits pgvector index limits while retaining quality |
-| Apache AGE for graph | Cypher queries, runs in-process with PG (no separate graph DB), ACID guarantees |
-| Azure Database for PostgreSQL | Managed service with native support for pgvector and AGE extensions |
-| LLM-generated data | Reproducible, realistic; makes the lab self-contained |
-| Pool per event-loop | Prevents stale connection errors when pytest creates new event loops per test |
-
-## Technologies
-
-| Component | Technology | Purpose |
-|-----------|-----------|---------|
-| Database | Azure Database for PostgreSQL Flexible Server (PG 16) | Unified managed store |
-| Vector search | pgvector (HNSW) | Semantic similarity |
-| Full-text search | tsvector + GIN | Keyword matching |
-| Graph engine | Apache AGE 1.6.0 | Cypher traversal |
-| Embeddings | Azure OpenAI `text-embedding-3-large` | 1536-dim vectors |
-| LLM | Azure OpenAI `gpt-4o-mini` | Data generation, agent reasoning |
-| Runtime | Python 3.11+ (asyncpg) | Async database access |
-| Infrastructure | Terraform | Azure resource provisioning |

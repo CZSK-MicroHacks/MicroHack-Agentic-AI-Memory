@@ -1,4 +1,14 @@
--- Create the biomedical knowledge graph in AGE
-SET search_path = ag_catalog, "$user", public;
+-- Reset and recreate the AGE graph used for graph traversal.
+DO $$
+BEGIN
+    IF EXISTS (
+        SELECT 1
+        FROM ag_catalog.ag_graph
+        WHERE name = 'biomedical'
+    ) THEN
+        PERFORM ag_catalog.drop_graph('biomedical', true);
+    END IF;
 
-SELECT create_graph('biomedical');
+    PERFORM ag_catalog.create_graph('biomedical');
+END
+$$;
