@@ -290,7 +290,8 @@ class AgentTools:
         TODO: Challenge 05 — Add self._rag_mcp_tool to this list to enable
         knowledge base search via MCP.
         """
-        return [self.get_order_status, self.check_memory, self.update_user_profile]
+        # TODO: Challenge 04 — Add self.update_user_profile to enable profile updates
+        return [self.get_order_status, self.check_memory]
 
     def for_rag_mode(self, rag_mode: str) -> list:
         """Return tool list for the given RAG mode.
@@ -300,6 +301,7 @@ class AgentTools:
           - "classic" → base tools + self.do_classic_rag
           - "none"    → base tools only
         """
-        base = [self.get_order_status, self.check_memory, self.update_user_profile]
+        # TODO: Challenge 04 — Add self.update_user_profile to enable profile updates
+        base = [self.get_order_status, self.check_memory]
         # TODO: Add RAG tools based on rag_mode
         return base

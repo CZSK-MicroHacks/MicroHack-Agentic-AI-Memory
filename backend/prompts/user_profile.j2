@@ -1,27 +1,8 @@
-{%- if user_profile is defined and user_profile %}
+{# TODO: Challenge 04 — Write the user profile injection template.
+   This template receives a `user_profile` variable (dict) and should
+   render the user's stored profile data into the system prompt.
 
-== USER PROFILE ==
-You have access to the following personal information about the current user.
-Use it to personalise your responses — greet them by name when appropriate,
-respect their stated preferences, and reference their interests or habits
-when relevant. Do NOT repeat the profile back verbatim; use it naturally.
+   Available sections: basic_info, interests, habits, preferences, status, facts.
+   Use Jinja2 conditionals to only render sections that have data.
 
-{%- if user_profile.basic_info %}
-Basic info: {{ user_profile.basic_info | tojson }}
-{%- endif %}
-{%- if user_profile.interests %}
-Interests: {{ user_profile.interests | join(", ") }}
-{%- endif %}
-{%- if user_profile.habits %}
-Habits: {{ user_profile.habits | join(", ") }}
-{%- endif %}
-{%- if user_profile.preferences %}
-Preferences: {{ user_profile.preferences | tojson }}
-{%- endif %}
-{%- if user_profile.status %}
-Current status: {{ user_profile.status | tojson }}
-{%- endif %}
-{%- if user_profile.facts %}
-Other facts: {{ user_profile.facts | join("; ") }}
-{%- endif %}
-{%- endif %}
+   See challenges/04-user-memory/README.md for requirements. #}
