@@ -26,11 +26,11 @@ logging.basicConfig(level=logging.WARNING)
 
 
 QUESTIONS = [
-    {"question": "A patient on Warfarin has a headache. What pain medications should they avoid?"},
-    {"question": "What do Metformin and Lisinopril have in common?"},
-    {"question": "What is the landscape of cardiovascular treatments?"},
-    {"question": "Could diabetes medication affect bleeding risk?"},
-    {"question": "Which drugs are most likely to have dangerous interactions?"},
+    {"question": "What is Warfarin used for?"},
+    {"question": "What is Metformin used for?"},
+    {"question": "What symptoms are associated with Hypertension?"},
+    {"question": "What is CYP2D6?"},
+    {"question": "Explain the Coagulation Cascade."},
 ]
 
 

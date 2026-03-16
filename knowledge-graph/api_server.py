@@ -38,11 +38,11 @@ app.add_middleware(
 # ── Questions ──
 
 QUESTIONS = [
-    {"id": 1, "question": "A patient on Warfarin has a headache. What pain medications should they avoid?"},
-    {"id": 2, "question": "What do Metformin and Lisinopril have in common?"},
-    {"id": 3, "question": "What is the landscape of cardiovascular treatments?"},
-    {"id": 4, "question": "Could diabetes medication affect bleeding risk?"},
-    {"id": 5, "question": "Which drugs are most likely to have dangerous interactions?"},
+    {"id": 1, "question": "What is Warfarin used for?"},
+    {"id": 2, "question": "What is Metformin used for?"},
+    {"id": 3, "question": "What symptoms are associated with Hypertension?"},
+    {"id": 4, "question": "What is CYP2D6?"},
+    {"id": 5, "question": "Explain the Coagulation Cascade."},
 ]
 
 
