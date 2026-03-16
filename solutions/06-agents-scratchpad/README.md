@@ -1,4 +1,4 @@
-# Solution 06: Agents Scratchpad
+# Solution 06 — Agents Scratchpad
 
 This solution explains the intended fix for the student version of `multi-agent/` on the `student-tk` branch.
 
@@ -23,7 +23,7 @@ The missing behavior is not about specialist agents. It is about the facilitator
 
 ## What students are expected to restore
 
-### 1. Facilitator tool exposure
+### Part 1: Facilitator tool exposure
 
 In `FacilitatorTools.all`, the facilitator should have access to the tools needed to:
 
@@ -44,7 +44,7 @@ def all(self) -> list:
     ]
 ```
 
-### 2. Facilitator instructions
+### Part 2: Facilitator instructions
 
 The prompt in `multi-agent\backend\prompts\facilitator.j2` should explicitly tell the facilitator to:
 

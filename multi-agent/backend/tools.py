@@ -213,4 +213,4 @@ class FacilitatorTools:
 
     @property
     def all(self) -> list:
-        return [self.create_tasks, self.get_plan_status, self.read_document, self.consolidate_section, self.read_document_clean]
+        return [self.create_tasks, self.get_plan_status, self.read_document]
