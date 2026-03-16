@@ -52,6 +52,8 @@ PG_FQDN=$(az postgres flexible-server show -n "pgflex-${PROJECT_NAME}-db" -g "$R
 BACKEND_FQDN=$(az containerapp show -n "$BACKEND_APP" -g "$RESOURCE_GROUP" --query "properties.configuration.ingress.fqdn" -o tsv)
 OPENAI_ENDPOINT=$(az cognitiveservices account show -n "aifoundry-${PROJECT_NAME}" -g "$RESOURCE_GROUP" --query "properties.endpoint" -o tsv)
 SEARCH_ENDPOINT=$(az search service show -n "search-${PROJECT_NAME}" -g "$RESOURCE_GROUP" --query "endpoint" -o tsv 2>/dev/null || echo "")
+REDIS_HOST=$(az redis show -n "redis-${PROJECT_NAME}" -g "$RESOURCE_GROUP" --query "hostName" -o tsv 2>/dev/null || echo "")
+REDIS_PASSWORD=$(az redis list-keys -n "redis-${PROJECT_NAME}" -g "$RESOURCE_GROUP" --query "primaryKey" -o tsv 2>/dev/null || echo "")
 
 # Auth settings (prefer Terraform outputs so deploy always matches infra state)
 AUTH_MODE="${AUTH_MODE:-$(terraform -chdir="$PROJECT_ROOT/infra" output -raw auth_mode 2>/dev/null || echo entra)}"
@@ -126,7 +128,11 @@ deploy_backend() {
       "AZURE_OPENAI_EMBEDDING_DEPLOYMENT_NAME=text-embedding-3-large" \
       "AZURE_SEARCH_ENDPOINT=${SEARCH_ENDPOINT}" \
       "AZURE_SEARCH_KNOWLEDGE_BASE_NAME=customer-support-kb" \
-      "AZURE_SEARCH_ORDERS_INDEX=orders"
+      "AZURE_SEARCH_ORDERS_INDEX=orders" \
+      "REDIS_HOST=${REDIS_HOST}" \
+      "REDIS_PORT=6380" \
+      "REDIS_PASSWORD=${REDIS_PASSWORD}" \
+      "REDIS_SSL=true"
   ok "Backend container app updated"
 
   # Ensure ingress target port matches uvicorn
@@ -306,6 +312,12 @@ PG_AAD_PRINCIPAL_NAME=id-${PROJECT_NAME}
 AZURE_SEARCH_ENDPOINT=${SEARCH_ENDPOINT}
 AZURE_SEARCH_KNOWLEDGE_BASE_NAME=customer-support-kb
 AZURE_SEARCH_ORDERS_INDEX=orders
+
+# Azure Cache for Redis (Session Memory)
+REDIS_HOST=${REDIS_HOST}
+REDIS_PORT=6380
+REDIS_PASSWORD=${REDIS_PASSWORD}
+REDIS_SSL=true
 EOF
   echo ""
 }

@@ -4,12 +4,11 @@ AG-UI Customer Support Server with Responses API (store=false)
 
 This server uses the Azure OpenAI Responses API with store=false and
 client-side state via AgentSession.  The framework manages
-conversation history in-memory via AgentSession; the backend
-serialises/deserialises session state between turns.
+conversation history via AgentSession; the backend serialises/deserialises
+session state between turns, persisting it in Azure Cache for Redis.
 
 Architecture:
-- SessionManager: Manages AgentSession instances with serialised session
-  state (in-memory dict now; Redis-backed later)
+- SessionManager: Manages AgentSession instances with Redis-backed persistence
 - AzureOpenAIResponsesClient + Agent with store=false: client-managed state
 - Cosmos DB: Durable conversation history for cross-session retrieval
 - Custom AG-UI endpoint: Integrates session management with streaming responses
@@ -128,24 +127,77 @@ class SessionInfo(BaseModel):
 
 class SessionManager:
     """
-    Session tracker with client-side session state (store=false mode).
+    Session tracker with optional Azure Cache for Redis backing.
 
-    Each session maps to an AgentSession whose history holds the
-    full conversation.  Serialised session state is kept in ``_session_states``
-    so evicted sessions can be restored without the Responses API.
-    Swap ``_session_states`` for a Redis-backed dict to persist across restarts.
+    When Redis is configured (REDIS_HOST is set and reachable), session state,
+    metadata and message counts are persisted to Redis so they survive restarts.
+    When Redis is **not** configured, everything falls back to in-memory dicts
+    (original behaviour — sessions are lost on restart).
+
+    Redis key layout (when connected):
+      session:{id}:state         – JSON string of AgentSession.to_dict()
+      session:{id}:metadata      – HASH  (title, created_at, last_activity, user_id)
+      session:{id}:message_count – integer counter (INCR)
     """
 
     def __init__(self, max_sessions: int = 1000):
-        self._sessions: dict[str, AgentSession] = {}
-        self._session_states: dict[str, dict] = {}  # serialised session snapshots
-        self._session_metadata: dict[str, dict[str, Any]] = {}
-        self._message_counts: dict[str, int] = {}  # local turn counter
+        self._sessions: dict[str, AgentSession] = {}  # in-memory hot cache
+        self._session_metadata: dict[str, dict[str, Any]] = {}  # in-memory fallback
+        self._message_counts: dict[str, int] = {}  # in-memory fallback
         self._max_sessions = max_sessions
+        self._redis: "redis.asyncio.Redis | None" = None
+
+    # ── Redis lifecycle ──────────────────────────────────────────────────
+
+    async def connect(self) -> None:
+        """Try to connect to Redis.  If unavailable, fall back to in-memory."""
+        host = os.getenv("REDIS_HOST", "")
+        if not host:
+            logger.info("REDIS_HOST not set — session manager running in-memory only")
+            return
+
+        try:
+            import redis.asyncio as aioredis
+
+            port = int(os.getenv("REDIS_PORT", "6380"))
+            password = os.getenv("REDIS_PASSWORD", "")
+            use_ssl = os.getenv("REDIS_SSL", "true").lower() in ("true", "1", "yes")
+
+            client = aioredis.Redis(
+                host=host,
+                port=port,
+                password=password if password else None,
+                ssl=use_ssl,
+                decode_responses=True,
+            )
+            await client.ping()
+            self._redis = client
+            logger.info("Redis connected: %s:%s (ssl=%s)", host, port, use_ssl)
+        except Exception as exc:
+            logger.warning("Redis connection failed (%s) — falling back to in-memory", exc)
+            self._redis = None
+
+    async def close(self) -> None:
+        """Close the Redis connection."""
+        if self._redis is not None:
+            await self._redis.aclose()
+            self._redis = None
+            logger.info("Redis connection closed")
+
+    # ── helpers ───────────────────────────────────────────────────────────
+
+    def _state_key(self, session_id: str) -> str:
+        return f"session:{session_id}:state"
+
+    def _meta_key(self, session_id: str) -> str:
+        return f"session:{session_id}:metadata"
+
+    def _count_key(self, session_id: str) -> str:
+        return f"session:{session_id}:message_count"
 
     # ── create ────────────────────────────────────────────────────────────
 
-    def create_session(
+    async def create_session(
         self,
         session_id: str | None = None,
         title: str | None = None,
@@ -155,97 +207,178 @@ class SessionManager:
         if session_id is None:
             session_id = str(uuid.uuid4())
 
-        # Evict oldest session if at capacity
+        # Evict oldest in-memory session if at capacity
         if len(self._sessions) >= self._max_sessions:
-            oldest_id = min(
-                self._session_metadata,
-                key=lambda k: self._session_metadata[k].get("last_activity", ""),
-            )
-            self.delete_session(oldest_id)
+            oldest_id = next(iter(self._sessions))
+            self._sessions.pop(oldest_id, None)
 
         session = AgentSession()
-
         self._sessions[session_id] = session
-        self._session_metadata[session_id] = {
-            "title": title,
+
+        metadata = {
+            "title": title or "",
             "created_at": datetime.utcnow().isoformat(),
             "last_activity": datetime.utcnow().isoformat(),
-            "user_id": user_id,
+            "user_id": user_id or "",
         }
-        self._message_counts[session_id] = 0
+
+        if self._redis is not None:
+            pipe = self._redis.pipeline()
+            pipe.hset(self._meta_key(session_id), mapping=metadata)
+            pipe.set(self._state_key(session_id), json.dumps(session.to_dict()))
+            pipe.set(self._count_key(session_id), 0)
+            await pipe.execute()
+        else:
+            self._session_metadata[session_id] = metadata
+            self._message_counts[session_id] = 0
+
         return session_id
 
     # ── get ───────────────────────────────────────────────────────────────
 
-    def get_session(self, session_id: str, auto_create: bool = True) -> AgentSession | None:
-        if session_id not in self._sessions:
-            # Try restoring from serialised session state
-            if session_id in self._session_states:
-                session = AgentSession.from_dict(self._session_states[session_id])
+    async def get_session(self, session_id: str, auto_create: bool = True) -> AgentSession | None:
+        # 1. Check in-memory cache
+        if session_id in self._sessions:
+            if self._redis is not None:
+                await self._redis.hset(
+                    self._meta_key(session_id),
+                    "last_activity",
+                    datetime.utcnow().isoformat(),
+                )
+            elif session_id in self._session_metadata:
+                self._session_metadata[session_id]["last_activity"] = datetime.utcnow().isoformat()
+            return self._sessions[session_id]
+
+        # 2. Try restoring from Redis
+        if self._redis is not None:
+            state_json = await self._redis.get(self._state_key(session_id))
+            if state_json is not None:
+                session = AgentSession.from_dict(json.loads(state_json))
                 self._sessions[session_id] = session
-            elif auto_create:
-                self.create_session(session_id)
-            else:
-                return None
-        if session_id in self._session_metadata:
-            self._session_metadata[session_id]["last_activity"] = datetime.utcnow().isoformat()
-        return self._sessions.get(session_id)
+                await self._redis.hset(
+                    self._meta_key(session_id),
+                    "last_activity",
+                    datetime.utcnow().isoformat(),
+                )
+                return session
+
+        # 3. Auto-create if requested
+        if auto_create:
+            await self.create_session(session_id)
+            return self._sessions.get(session_id)
+
+        return None
 
     # ── delete / update ───────────────────────────────────────────────────
 
-    def delete_session(self, session_id: str) -> bool:
-        existed = session_id in self._sessions or session_id in self._session_states
+    async def delete_session(self, session_id: str) -> bool:
+        existed = session_id in self._sessions
         self._sessions.pop(session_id, None)
-        self._session_states.pop(session_id, None)
         self._session_metadata.pop(session_id, None)
         self._message_counts.pop(session_id, None)
+
+        if self._redis is not None:
+            result = await self._redis.delete(
+                self._state_key(session_id),
+                self._meta_key(session_id),
+                self._count_key(session_id),
+            )
+            existed = existed or result > 0
+
         return existed
 
-    def update_session(self, session_id: str, title: str | None = None) -> bool:
+    async def update_session(self, session_id: str, title: str | None = None) -> bool:
+        if self._redis is not None:
+            exists = await self._redis.exists(self._meta_key(session_id))
+            if not exists:
+                return False
+            updates: dict[str, str] = {"last_activity": datetime.utcnow().isoformat()}
+            if title is not None:
+                updates["title"] = title
+            await self._redis.hset(self._meta_key(session_id), mapping=updates)
+            return True
+
+        # Fallback: in-memory only
         if session_id not in self._sessions:
             return False
-        metadata = self._session_metadata.get(session_id, {})
+        meta = self._session_metadata.get(session_id, {})
         if title is not None:
-            metadata["title"] = title
-        metadata["last_activity"] = datetime.utcnow().isoformat()
-        self._session_metadata[session_id] = metadata
+            meta["title"] = title
+        meta["last_activity"] = datetime.utcnow().isoformat()
+        self._session_metadata[session_id] = meta
         return True
 
-    def increment_message_count(self, session_id: str, n: int = 2) -> None:
+    async def increment_message_count(self, session_id: str, n: int = 2) -> None:
         """Increment message count (default +2 for user+assistant turn)."""
-        self._message_counts[session_id] = self._message_counts.get(session_id, 0) + n
+        if self._redis is not None:
+            await self._redis.incrby(self._count_key(session_id), n)
+        else:
+            self._message_counts[session_id] = self._message_counts.get(session_id, 0) + n
 
     # ── info / list ───────────────────────────────────────────────────────
 
-    def save_session_state(self, session_id: str) -> None:
-        """Serialise the current session and store in ``_session_states``."""
+    async def save_session_state(self, session_id: str) -> None:
+        """Serialise the current session and persist to Redis (no-op if Redis is not connected)."""
         session = self._sessions.get(session_id)
-        if session is not None:
-            self._session_states[session_id] = session.to_dict()
+        if session is not None and self._redis is not None:
+            await self._redis.set(
+                self._state_key(session_id),
+                json.dumps(session.to_dict()),
+            )
 
     async def get_session_info(self, session_id: str) -> SessionInfo | None:
-        session = self._sessions.get(session_id)
-        if session is None and session_id not in self._session_states:
-            return None
-        metadata = self._session_metadata.get(session_id, {})
+        metadata: dict[str, str] = {}
+        message_count = 0
+
+        if self._redis is not None:
+            metadata = await self._redis.hgetall(self._meta_key(session_id))
+            if not metadata:
+                return None
+            count_str = await self._redis.get(self._count_key(session_id))
+            message_count = int(count_str) if count_str else 0
+        else:
+            if session_id not in self._sessions:
+                return None
+            metadata = {k: str(v) for k, v in self._session_metadata.get(session_id, {}).items()}
+            message_count = self._message_counts.get(session_id, 0)
+
         return SessionInfo(
             session_id=session_id,
-            title=metadata.get("title"),
+            title=metadata.get("title") or None,
             created_at=metadata.get("created_at", "unknown"),
-            message_count=self._message_counts.get(session_id, 0),
+            message_count=message_count,
             last_activity=metadata.get("last_activity"),
         )
 
     async def list_sessions(self, user_id: str | None = None) -> list[SessionInfo]:
         sessions: list[SessionInfo] = []
-        for session_id in self._sessions:
-            if user_id is not None:
-                meta = self._session_metadata.get(session_id, {})
-                if meta.get("user_id") != user_id:
+
+        if self._redis is not None:
+            # Scan for all session metadata keys
+            async for key in self._redis.scan_iter(match="session:*:metadata"):
+                session_id = key.split(":")[1]
+                metadata = await self._redis.hgetall(self._meta_key(session_id))
+                if user_id is not None and metadata.get("user_id") != user_id:
                     continue
-            info = await self.get_session_info(session_id)
-            if info:
-                sessions.append(info)
+                count_str = await self._redis.get(self._count_key(session_id))
+                message_count = int(count_str) if count_str else 0
+                sessions.append(SessionInfo(
+                    session_id=session_id,
+                    title=metadata.get("title") or None,
+                    created_at=metadata.get("created_at", "unknown"),
+                    message_count=message_count,
+                    last_activity=metadata.get("last_activity"),
+                ))
+        else:
+            for session_id in self._sessions:
+                if user_id is not None:
+                    meta = self._session_metadata.get(session_id, {})
+                    if meta.get("user_id") != user_id:
+                        continue
+                info = await self.get_session_info(session_id)
+                if info:
+                    sessions.append(info)
+
         return sessions
 
 
@@ -355,6 +488,10 @@ def _build_personalized_agent(
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Lifespan context manager for startup and shutdown events."""
+    # Startup: Initialize Redis (session memory)
+    await session_manager.connect()
+    logger.info("Session manager initialized (Azure Cache for Redis)")
+
     # Startup: Initialize Cosmos DB and PostgreSQL
     await conversation_store.initialize()
     logger.info("Conversation history store initialized (Cosmos DB)")
@@ -384,6 +521,8 @@ async def lifespan(app: FastAPI):
     # logger.info("Conversation memory store closed")
     await profile_store.close()
     logger.info("User profile memory store closed")
+    await session_manager.close()
+    logger.info("Session manager closed (Redis)")
 
 
 app = FastAPI(
@@ -407,13 +546,23 @@ app.add_middleware(
 # Auth helpers
 # =============================================================================
 
-def _assert_session_owner(session_id: str, user_id: str) -> None:
+async def _assert_session_owner(session_id: str, user_id: str) -> None:
     """Raise 403 if the session does not belong to the user."""
-    meta = session_manager._session_metadata.get(session_id)
-    if meta is None:
-        return  # session doesn't exist yet — will 404 later
-    if meta.get("user_id") is not None and meta["user_id"] != user_id:
-        raise HTTPException(status_code=403, detail="Access denied")
+    if session_manager._redis is not None:
+        meta_user = await session_manager._redis.hget(
+            session_manager._meta_key(session_id), "user_id"
+        )
+        if meta_user is None:
+            return  # session doesn't exist yet — will 404 later
+        if meta_user and meta_user != user_id:
+            raise HTTPException(status_code=403, detail="Access denied")
+    else:
+        # Fallback: check in-memory metadata
+        meta = session_manager._session_metadata.get(session_id)
+        if meta is None:
+            return  # session doesn't exist yet — will 404 later
+        if meta.get("user_id") and meta["user_id"] != user_id:
+            raise HTTPException(status_code=403, detail="Access denied")
 
 
 @app.get("/me")
@@ -495,7 +644,7 @@ async def create_session(
     current_user: User = Depends(get_current_user),
 ):
     """Create a new chat session."""
-    session_id = session_manager.create_session(
+    session_id = await session_manager.create_session(
         session_id=request.session_id if request else None,
         title=request.title if request else None,
         user_id=current_user.user_id,
@@ -519,7 +668,7 @@ async def get_session(
     current_user: User = Depends(get_current_user),
 ):
     """Get information about a specific session."""
-    _assert_session_owner(session_id, current_user.user_id)
+    await _assert_session_owner(session_id, current_user.user_id)
     info = await session_manager.get_session_info(session_id)
     if info is None:
         raise HTTPException(status_code=404, detail="Session not found")
@@ -537,7 +686,7 @@ async def get_session_history(
     falling back to the in-memory session state when Cosmos DB
     is not yet implemented or the document is missing.
     """
-    _assert_session_owner(session_id, current_user.user_id)
+    await _assert_session_owner(session_id, current_user.user_id)
 
     # Try Cosmos DB first (durable store)
     doc = await conversation_store.get_conversation(session_id, current_user.user_id)
@@ -549,7 +698,7 @@ async def get_session_history(
         }
 
     # Fallback: serve from in-memory session state
-    session = session_manager.get_session(session_id, auto_create=False)
+    session = await session_manager.get_session(session_id, auto_create=False)
     if session is None:
         raise HTTPException(status_code=404, detail="Session not found")
 
@@ -604,8 +753,8 @@ async def update_session(
     current_user: User = Depends(get_current_user),
 ):
     """Update session metadata (e.g. title)."""
-    _assert_session_owner(session_id, current_user.user_id)
-    if not session_manager.update_session(session_id, title=request.title):
+    await _assert_session_owner(session_id, current_user.user_id)
+    if not await session_manager.update_session(session_id, title=request.title):
         raise HTTPException(status_code=404, detail="Session not found")
     info = await session_manager.get_session_info(session_id)
     return info
@@ -617,8 +766,8 @@ async def delete_session(
     current_user: User = Depends(get_current_user),
 ):
     """Delete a session and its history (also removes from Cosmos DB)."""
-    _assert_session_owner(session_id, current_user.user_id)
-    if session_manager.delete_session(session_id):
+    await _assert_session_owner(session_id, current_user.user_id)
+    if await session_manager.delete_session(session_id):
         # Also remove from durable conversation history
         await conversation_store.delete_conversation(session_id, current_user.user_id)
         return {"message": "Session deleted successfully"}
@@ -1282,12 +1431,18 @@ async def stream_agent_response(
 
         # With store=false the framework keeps messages in the session.
         # Serialise the session state so it can survive session eviction.
-        session_manager.save_session_state(session_id)
+        await session_manager.save_session_state(session_id)
         logger.info("session=%s session_state_saved", session_id)
 
         # Track message count and persist the turn to Cosmos DB
-        session_manager.increment_message_count(session_id)
-        session_title = session_manager._session_metadata.get(session_id, {}).get("title")
+        await session_manager.increment_message_count(session_id)
+        session_title = None
+        if session_manager._redis is not None:
+            session_title = await session_manager._redis.hget(
+                session_manager._meta_key(session_id), "title"
+            )
+        else:
+            session_title = session_manager._session_metadata.get(session_id, {}).get("title")
         await _persist_turn(session_id, user_id, user_message, assistant_text, session_title, rag_mode=rag_mode)
 
         # Emit RUN_FINISHED as the very last yield so all bookkeeping is done first
@@ -1316,20 +1471,23 @@ async def chat(
     """
     # Get or create session
     session_id = request.thread_id or str(uuid.uuid4())
-    # If session already exists (live or serialised), verify ownership
-    if session_id in session_manager._sessions or session_id in session_manager._session_states:
-        _assert_session_owner(session_id, current_user.user_id)
+    # Check if session exists in Redis or in-memory
+    session_exists = session_id in session_manager._sessions
+    if not session_exists and session_manager._redis is not None:
+        session_exists = await session_manager._redis.exists(session_manager._meta_key(session_id))
+    if session_exists:
+        await _assert_session_owner(session_id, current_user.user_id)
     else:
-        # Session not in memory — create a fresh one.
+        # Session not found — create a fresh one.
         conversation = await conversation_store.get_conversation(
             session_id, current_user.user_id
         )
-        session_manager.create_session(
+        await session_manager.create_session(
             session_id,
             title=conversation.get("title") if conversation else None,
             user_id=current_user.user_id,
         )
-    session = session_manager.get_session(session_id, auto_create=False)
+    session = await session_manager.get_session(session_id, auto_create=False)
     
     if session is None:
         raise HTTPException(status_code=500, detail="Failed to create session")
