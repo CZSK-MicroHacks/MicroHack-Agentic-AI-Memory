@@ -348,6 +348,11 @@ resource "azurerm_container_app" "backend" {
     identity = azurerm_user_assigned_identity.app.id
   }
 
+  secret {
+    name  = "redis-password"
+    value = azurerm_redis_cache.main.primary_access_key
+  }
+
   template {
     min_replicas = 1
     max_replicas = 1
@@ -441,6 +446,22 @@ resource "azurerm_container_app" "backend" {
       env {
         name  = "PG_AAD_PRINCIPAL_NAME"
         value = azurerm_user_assigned_identity.app.name
+      }
+      env {
+        name  = "REDIS_HOST"
+        value = azurerm_redis_cache.main.hostname
+      }
+      env {
+        name  = "REDIS_PORT"
+        value = tostring(azurerm_redis_cache.main.ssl_port)
+      }
+      env {
+        name      = "REDIS_PASSWORD"
+        secret_name = "redis-password"
+      }
+      env {
+        name  = "REDIS_SSL"
+        value = "true"
       }
     }
   }
