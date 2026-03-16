@@ -43,7 +43,7 @@ from user_profile_memory import UserProfileMemoryStore
 from profile_agent import ProfileAgent
 from agent_tools import AgentTools
 
-from agent_framework import Agent, AgentSession
+from agent_framework import Agent, AgentSession, InMemoryHistoryProvider
 from agent_framework.azure import AzureOpenAIChatClient, AzureOpenAIResponsesClient
 from azure.identity import DefaultAzureCredential
 
@@ -313,6 +313,7 @@ agent = Agent(
     instructions=CUSTOMER_SUPPORT_PROMPT,
     client=responses_client,
     tools=agent_tools.all,
+    context_providers=[InMemoryHistoryProvider()],
     default_options={"store": False},
 )
 
@@ -342,6 +343,7 @@ def _build_personalized_agent(
         instructions=prompt,
         client=responses_client,
         tools=tools,
+        context_providers=[InMemoryHistoryProvider()],
         default_options={"store": False},
     )
 
@@ -531,16 +533,67 @@ async def get_session_history(
 ):
     """Get the full message history for a session.
 
-    Served from the durable Cosmos DB copy of the conversation.
+    Served from the durable Cosmos DB copy of the conversation,
+    falling back to the in-memory session state when Cosmos DB
+    is not yet implemented or the document is missing.
     """
     _assert_session_owner(session_id, current_user.user_id)
+
+    # Try Cosmos DB first (durable store)
     doc = await conversation_store.get_conversation(session_id, current_user.user_id)
-    if doc is None:
+    if doc is not None:
+        return {
+            "session_id": session_id,
+            "messages": doc.get("messages", []),
+            "metadata": doc.get("metadata", {}),
+        }
+
+    # Fallback: serve from in-memory session state
+    session = session_manager.get_session(session_id, auto_create=False)
+    if session is None:
         raise HTTPException(status_code=404, detail="Session not found")
+
+    raw_messages = session.state.get("in_memory", {}).get("messages", [])
+    if not raw_messages:
+        raw_messages = session.state.get("messages", [])
+    messages = []
+    for m in raw_messages:
+        if isinstance(m, dict):
+            messages.append(m)
+            continue
+        if not hasattr(m, "role"):
+            continue
+        entry: dict[str, Any] = {"role": m.role, "content": ""}
+        tool_calls = []
+        tool_results = []
+        for c in getattr(m, "contents", []):
+            ctype = getattr(c, "type", None)
+            if ctype == "text":
+                entry["content"] = c.text or ""
+            elif ctype == "function_call":
+                tool_calls.append({
+                    "call_id": c.call_id or "",
+                    "name": c.name or "",
+                    "arguments": c.arguments if isinstance(c.arguments, str) else json.dumps(c.arguments or {}),
+                })
+            elif ctype == "function_result":
+                result_val = c.result
+                if not isinstance(result_val, str):
+                    result_val = json.dumps(result_val) if result_val is not None else ""
+                tool_results.append({
+                    "call_id": c.call_id or "",
+                    "result": result_val,
+                })
+        if tool_calls:
+            entry["tool_calls"] = tool_calls
+        if tool_results:
+            entry["tool_results"] = tool_results
+        messages.append(entry)
+
     return {
         "session_id": session_id,
-        "messages": doc.get("messages", []),
-        "metadata": doc.get("metadata", {}),
+        "messages": messages,
+        "metadata": {},
     }
 
 
@@ -1171,7 +1224,8 @@ async def stream_agent_response(
         # Use personalized agent if available, otherwise fall back to default
         active_agent = personalized_agent or agent
         # Stream agent response - framework handles history automatically
-        async for update in active_agent.run(user_message, stream=True, session=session):
+        response_stream = active_agent.run(user_message, stream=True, session=session)
+        async for update in response_stream:
             # Emit text content
             if update.text:
                 full_response_text.append(update.text)
@@ -1221,7 +1275,10 @@ async def stream_agent_response(
         # Log the full assembled assistant response
         assistant_text = "".join(full_response_text)
         logger.info("[OUT] session=%s run=%s event=RUN_FINISHED response=%s", session_id, run_id, assistant_text)
-        yield encoder.encode(RunFinishedEvent(thread_id=session_id, run_id=run_id))
+
+        # Finalize the stream so the framework's InMemoryHistoryProvider
+        # saves messages into session.state (result hooks / after_run).
+        await response_stream.get_final_response()
 
         # With store=false the framework keeps messages in the session.
         # Serialise the session state so it can survive session eviction.
@@ -1232,6 +1289,9 @@ async def stream_agent_response(
         session_manager.increment_message_count(session_id)
         session_title = session_manager._session_metadata.get(session_id, {}).get("title")
         await _persist_turn(session_id, user_id, user_message, assistant_text, session_title, rag_mode=rag_mode)
+
+        # Emit RUN_FINISHED as the very last yield so all bookkeeping is done first
+        yield encoder.encode(RunFinishedEvent(thread_id=session_id, run_id=run_id))
 
     except Exception as e:
         logger.error("[OUT] session=%s run=%s event=RUN_ERROR error=%s", session_id, run_id, str(e), exc_info=True)
