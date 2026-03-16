@@ -4,7 +4,7 @@
 
 The multi-agent travel planner already works — the facilitator creates tasks, specialist agents run, and the shared scratchpad fills with itinerary ideas. But the workflow stops too early: the facilitator never completes the final merge/review phase.
 
-In this challenge, you will restore the missing facilitator behavior so the shared scratchpad becomes a reviewed final itinerary instead of just a raw collaboration space.
+In this challenge, you will complete the facilitator workflow so the shared scratchpad becomes a reviewed final itinerary instead of just a raw collaboration space.
 
 After completing this challenge, students should understand the main message of multi-agent shared memory:
 
@@ -26,14 +26,14 @@ After completing this challenge, students should understand the main message of 
   - creates tasks
   - dispatches specialists
   - checks progress
-- The **student version** of the app lives on the `student-tk` branch
+- The challenge-ready version of the app lives on the `student-tk` branch
 - The `main` branch keeps the completed reference implementation
 
 ## Your Task
 
-You need to restore two small but important pieces of the facilitator workflow.
+You need to complete two small but important pieces of the facilitator workflow.
 
-### Part 1: Restore facilitator tool access
+### Part 1: Complete facilitator tool access
 
 Open `multi-agent\backend\tools.py` and inspect `FacilitatorTools`.
 
@@ -44,7 +44,7 @@ The facilitator should have access to the tools needed to:
 
 In the student branch, that final facilitator tool access is intentionally incomplete.
 
-### Part 2: Restore facilitator instructions
+### Part 2: Complete facilitator instructions
 
 Open `multi-agent\backend\prompts\facilitator.j2`.
 

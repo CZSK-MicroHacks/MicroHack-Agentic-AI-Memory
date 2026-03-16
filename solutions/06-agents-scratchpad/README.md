@@ -1,6 +1,6 @@
 # Solution 06 — Agents Scratchpad
 
-This solution explains the intended fix for the student version of `multi-agent/` on the `student-tk` branch.
+This solution explains the intended implementation for the challenge-ready version of `multi-agent/` on the `student-tk` branch.
 
 ## The intended bug
 
@@ -19,9 +19,9 @@ Two facilitator-facing pieces are intentionally incomplete:
 1. `multi-agent\backend\tools.py`
 2. `multi-agent\backend\prompts\facilitator.j2`
 
-The missing behavior is not about specialist agents. It is about the facilitator being unable or unlikely to finish the scratchpad lifecycle.
+The key behavior is not about specialist agents. It is about the facilitator being able and likely to finish the scratchpad lifecycle.
 
-## What students are expected to restore
+## What students are expected to complete
 
 ### Part 1: Facilitator tool exposure
 
@@ -54,7 +54,7 @@ The prompt in `multi-agent\backend\prompts\facilitator.j2` should explicitly tel
 - run a final clean review
 - only then answer the user
 
-The important ideas to restore are:
+The important ideas to implement are:
 
 - a consolidation phase after specialist execution
 - a final review phase using `read_document_clean`
@@ -79,4 +79,4 @@ After the fix, the workflow should behave like this:
 4. the facilitator reads the clean version
 5. the final answer reflects the reviewed itinerary
 
-If students restore those two seams, they have completed the challenge.
+If students complete those two seams, they have completed the challenge.
