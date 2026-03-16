@@ -362,14 +362,18 @@ async def lifespan(app: FastAPI):
     logger.info("User profile memory store initialized (Cosmos DB)")
 
     # Connect the MCP RAG tool (establishes MCP session with Azure AI Search)
-    await rag_mcp_tool.connect()
-    logger.info("RAG MCP tool connected (Azure AI Search knowledge base)")
+    if rag_mcp_tool is not None:
+        await rag_mcp_tool.connect()
+        logger.info("RAG MCP tool connected (Azure AI Search knowledge base)")
+    else:
+        logger.info("RAG MCP tool not configured — skipping connection")
 
     yield
 
     # Shutdown: Close MCP tool and data stores
-    await rag_mcp_tool.close()
-    logger.info("RAG MCP tool disconnected")
+    if rag_mcp_tool is not None:
+        await rag_mcp_tool.close()
+        logger.info("RAG MCP tool disconnected")
     await conversation_store.close()
     logger.info("Conversation history store closed")
     await memory_store.close()

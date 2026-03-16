@@ -279,14 +279,21 @@ class AgentTools:
 
     @property
     def all(self) -> list:
-        """All tools including agentic RAG via MCP."""
-        return [self.get_order_status, self.check_memory, self._rag_mcp_tool, self.update_user_profile]
+        """All tools including agentic RAG via MCP.
+
+        TODO: Challenge 05 — Add self._rag_mcp_tool to this list to enable
+        knowledge base search via MCP.
+        """
+        return [self.get_order_status, self.check_memory, self.update_user_profile]
 
     def for_rag_mode(self, rag_mode: str) -> list:
-        """Return tool list for the given RAG mode."""
+        """Return tool list for the given RAG mode.
+
+        TODO: Challenge 05 — Implement RAG mode switching:
+          - "agentic" → base tools + self._rag_mcp_tool
+          - "classic" → base tools + self.do_classic_rag
+          - "none"    → base tools only
+        """
         base = [self.get_order_status, self.check_memory, self.update_user_profile]
-        if rag_mode == "agentic":
-            return base + [self._rag_mcp_tool]
-        elif rag_mode == "classic":
-            return base + [self.do_classic_rag]
-        return base  # "none"
+        # TODO: Add RAG tools based on rag_mode
+        return base

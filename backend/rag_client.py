@@ -108,7 +108,7 @@ def create_rag_mcp_tool(
     search_endpoint: str | None = None,
     knowledge_base_name: str | None = None,
     credential: DefaultAzureCredential | None = None,
-) -> MCPStreamableHTTPTool:
+) -> MCPStreamableHTTPTool | None:
     """Create an MCPStreamableHTTPTool for Azure AI Search agentic retrieval.
 
     The returned tool must be used as an async context manager (``async with``)
@@ -122,30 +122,19 @@ def create_rag_mcp_tool(
         credential: Azure credential for token acquisition.
 
     Returns:
-        An MCPStreamableHTTPTool ready to be connected.
+        An MCPStreamableHTTPTool ready to be connected, or None if not implemented.
     """
-    endpoint = (search_endpoint or os.getenv("AZURE_SEARCH_ENDPOINT", "")).rstrip("/")
-    kb_name = knowledge_base_name or os.getenv(
-        "AZURE_SEARCH_KNOWLEDGE_BASE_NAME", "customer-support-kb"
-    )
-
-    url = f"{endpoint}/knowledgebases/{kb_name}/mcp?api-version={API_VERSION}"
-
-    cred = credential or DefaultAzureCredential()
-    auth = _AzureSearchAuth(cred)
-    http_client = httpx.AsyncClient(auth=auth)
-
-    logger.info("Creating MCP RAG tool: url=%s", url)
-
-    return MCPStreamableHTTPTool(
-        name="knowledge_base",
-        url=url,
-        description=(
-            "Search the company knowledge base for detailed information "
-            "about orders, products, shipping, and return/refund policies."
-        ),
-        http_client=http_client,
-        approval_mode="never_require",
-        load_prompts=False,
-        parse_tool_results=_parse_mcp_rag_result,
-    )
+    # TODO: Implement as part of Challenge 05.
+    # This function should:
+    #   1. Read the Azure AI Search endpoint and knowledge base name from
+    #      parameters or environment variables (AZURE_SEARCH_ENDPOINT,
+    #      AZURE_SEARCH_KNOWLEDGE_BASE_NAME)
+    #   2. Build the MCP endpoint URL
+    #   3. Create an authenticated httpx.AsyncClient using _AzureSearchAuth
+    #   4. Return an MCPStreamableHTTPTool configured with the URL, auth,
+    #      and _parse_mcp_rag_result as the result parser
+    #
+    # Hint: Look at _AzureSearchAuth and _parse_mcp_rag_result in this file.
+    # Hint: The API_VERSION constant is defined at the top of this file.
+    logger.info("RAG MCP tool not implemented — returning None")
+    return None
