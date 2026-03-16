@@ -96,6 +96,12 @@ class AgentTools:
         """
         user_id = self._current_user_id.get()
         logger.info("Running check_memory tool with query: %s for user: %s", query, user_id)
+
+        # Gracefully handle uninitialised memory store
+        if self._memory_store._pool is None:
+            logger.info("Memory store not initialized — returning no results")
+            return "No relevant past conversations found."
+
         query_embedding = await self._memory_agent._embed(query)
 
         rows = await self._memory_store.search(

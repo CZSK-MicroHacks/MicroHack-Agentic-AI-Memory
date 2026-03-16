@@ -356,8 +356,9 @@ async def lifespan(app: FastAPI):
     # Startup: Initialize Cosmos DB and PostgreSQL
     await conversation_store.initialize()
     logger.info("Conversation history store initialized (Cosmos DB)")
-    await memory_store.initialize()
-    logger.info("Conversation memory store initialized (PostgreSQL)")
+    # TODO: Challenge 03 — Initialize the conversation memory store (PostgreSQL + pgvector)
+    # await memory_store.initialize()
+    # logger.info("Conversation memory store initialized (PostgreSQL)")
     await profile_store.initialize()
     logger.info("User profile memory store initialized (Cosmos DB)")
 
@@ -376,8 +377,9 @@ async def lifespan(app: FastAPI):
         logger.info("RAG MCP tool disconnected")
     await conversation_store.close()
     logger.info("Conversation history store closed")
-    await memory_store.close()
-    logger.info("Conversation memory store closed")
+    # TODO: Challenge 03 — Close the conversation memory store
+    # await memory_store.close()
+    # logger.info("Conversation memory store closed")
     await profile_store.close()
     logger.info("User profile memory store closed")
 
@@ -659,8 +661,11 @@ async def delete_conversation(
     deleted = await conversation_store.delete_conversation(conversation_id, current_user.user_id)
     if not deleted:
         raise HTTPException(status_code=404, detail="Conversation not found")
-    # Cascade: also remove any associated memory
-    await memory_store.delete_memory(conversation_id, current_user.user_id)
+    # Cascade: also remove any associated memory (if store is initialized)
+    try:
+        await memory_store.delete_memory(conversation_id, current_user.user_id)
+    except RuntimeError:
+        pass  # memory store not initialized — skip cascade
     return {"message": "Conversation deleted successfully"}
 
 
@@ -732,34 +737,13 @@ async def create_memory(
     Fetches the full conversation from Cosmos DB, runs the summarisation agent,
     generates an embedding, and stores the result in PostgreSQL.
     """
-    # 1. Validate ownership and fetch the conversation
-    conversation = await conversation_store.get_conversation(
-        request.conversation_id, current_user.user_id
-    )
-    if conversation is None:
-        raise HTTPException(status_code=404, detail="Conversation not found")
-
-    messages = conversation.get("messages", [])
-    if not messages:
-        raise HTTPException(status_code=422, detail="Conversation has no messages to summarise")
-
-    # 2. Run memory agent (summarise + embed)
-    result = await memory_agent.create_memory(
-        conversation_messages=messages,
-        title=conversation.get("title"),
-    )
-
-    # 3. Persist to PostgreSQL
-    row = await memory_store.create_memory(
-        conversation_id=request.conversation_id,
-        user_id=current_user.user_id,
-        summary=result.summary,
-        embedding=result.embedding,
-        source_title=conversation.get("title"),
-        message_count=conversation.get("message_count", len(messages)),
-    )
-
-    return _row_to_memory_response(row)
+    # TODO: Challenge 03 — Implement this endpoint:
+    #   1. Fetch the conversation from Cosmos DB (conversation_store.get_conversation)
+    #   2. Validate it exists and has messages
+    #   3. Run the memory agent to summarise + embed (memory_agent.create_memory)
+    #   4. Persist the result to PostgreSQL (memory_store.create_memory)
+    #   5. Return the created memory as a MemorySummaryResponse
+    raise HTTPException(status_code=501, detail="Not implemented — complete Challenge 03")
 
 
 @app.get("/memories", response_model=list[MemorySummaryResponse])
@@ -769,6 +753,8 @@ async def list_memories(
     current_user: User = Depends(get_current_user),
 ):
     """List all conversation memories for the current user."""
+    if memory_store._pool is None:
+        return []
     rows = await memory_store.list_memories(
         user_id=current_user.user_id,
         limit=limit,
@@ -783,6 +769,8 @@ async def get_memory(
     current_user: User = Depends(get_current_user),
 ):
     """Get a single conversation memory."""
+    if memory_store._pool is None:
+        raise HTTPException(status_code=404, detail="Memory not found")
     row = await memory_store.get_memory(conversation_id, current_user.user_id)
     if row is None:
         raise HTTPException(status_code=404, detail="Memory not found")
@@ -795,6 +783,8 @@ async def delete_memory(
     current_user: User = Depends(get_current_user),
 ):
     """Delete a conversation memory."""
+    if memory_store._pool is None:
+        raise HTTPException(status_code=404, detail="Memory not found")
     deleted = await memory_store.delete_memory(conversation_id, current_user.user_id)
     if not deleted:
         raise HTTPException(status_code=404, detail="Memory not found")
@@ -812,6 +802,8 @@ async def search_memories(
     Generates an embedding for the query text, then performs cosine-similarity
     search in PostgreSQL (pgvector) scoped to the current user.
     """
+    if memory_store._pool is None:
+        return MemorySearchResponse(query=request.query, results=[])
     # Generate embedding for the search query
     query_embedding = await memory_agent._embed(request.query)
 
