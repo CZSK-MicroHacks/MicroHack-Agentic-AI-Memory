@@ -17,9 +17,11 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
 # ── Configuration (derived from Terraform outputs) ──────────────────────────
-RESOURCE_GROUP="rg-mh-ai-memory"
-PROJECT_NAME="mhaimem"
-SUBSCRIPTION_ID="de281c5e-5d60-4fc1-b905-c91caf45e624"
+RESOURCE_GROUP="rg-mhaimemk-001"
+PROJECT_NAME="mhaimemk001"
+SUBSCRIPTION_ID="6766574f-da48-496f-b65a-18d9e5f726a4"
+
+echo "Starting deployment of projet ${PROJECT_NAME} into RG: ${RESOURCE_GROUP} (sub: ${SUBSCRIPTION_ID})..."
 
 # Ensure correct subscription
 az account set -s "$SUBSCRIPTION_ID"
@@ -46,7 +48,7 @@ BUILD_ID="${DEPLOY_BUILD_ID:-$(git -C "$PROJECT_ROOT" rev-parse HEAD 2>/dev/null
 
 # ── Service endpoints (from Terraform-provisioned resources) ────────────────
 COSMOS_ENDPOINT=$(az cosmosdb show -n "cosmos-${PROJECT_NAME}" -g "$RESOURCE_GROUP" --query documentEndpoint -o tsv)
-PG_FQDN=$(az postgres flexible-server show -n "pgflex-${PROJECT_NAME}" -g "$RESOURCE_GROUP" --query fullyQualifiedDomainName -o tsv)
+PG_FQDN=$(az postgres flexible-server show -n "pgflex-${PROJECT_NAME}-db" -g "$RESOURCE_GROUP" --query fullyQualifiedDomainName -o tsv)
 BACKEND_FQDN=$(az containerapp show -n "$BACKEND_APP" -g "$RESOURCE_GROUP" --query "properties.configuration.ingress.fqdn" -o tsv)
 OPENAI_ENDPOINT=$(az cognitiveservices account show -n "aifoundry-${PROJECT_NAME}" -g "$RESOURCE_GROUP" --query "properties.endpoint" -o tsv)
 SEARCH_ENDPOINT=$(az search service show -n "search-${PROJECT_NAME}" -g "$RESOURCE_GROUP" --query "endpoint" -o tsv 2>/dev/null || echo "")
@@ -264,6 +266,50 @@ smoke_test() {
   echo "  Backend:  ${backend_url}"
 }
 
+# ── Print .env variables for local development ─────────────────────────────
+print_env_summary() {
+  echo ""
+  echo "╔══════════════════════════════════════════════════════════════╗"
+  echo "║  backend/.env – copy the block below into your .env file   ║"
+  echo "╚══════════════════════════════════════════════════════════════╝"
+  cat <<EOF
+
+# Azure OpenAI Configuration
+AZURE_OPENAI_ENDPOINT=${OPENAI_ENDPOINT}
+AZURE_OPENAI_DEPLOYMENT_NAME=gpt-4o-mini
+AZURE_OPENAI_EMBEDDING_DEPLOYMENT_NAME=text-embedding-3-large
+
+# ── Azure Cosmos DB (Conversation History) ──────────────────
+COSMOS_ENDPOINT=${COSMOS_ENDPOINT}
+COSMOS_DATABASE_NAME=ag-ui-db
+COSMOS_CONTAINER_NAME=conversations
+
+COSMOS_UPM_DATABASE_NAME=ag-ui-db
+COSMOS_UPM_CONTAINER_NAME=user_profiles
+
+# Local auth mode
+AUTH_MODE=${AUTH_MODE}
+# These variables are only needed for Entra authentication
+# AZURE_CLIENT_ID=${IDENTITY_CLIENT_ID}
+# ENTRA_TENANT_ID=${ENTRA_TENANT_ID}
+# ENTRA_AUDIENCE=${BACKEND_API_CLIENT_ID}
+# ENTRA_REQUIRED_SCOPES=access_as_user
+
+# Postgres db
+PG_HOST=${PG_FQDN}
+PG_PORT=5432
+PG_DATABASE=appdb
+PG_AUTH_MODE=managed_identity
+PG_AAD_PRINCIPAL_NAME=id-${PROJECT_NAME}
+
+# Azure AI Search
+AZURE_SEARCH_ENDPOINT=${SEARCH_ENDPOINT}
+AZURE_SEARCH_KNOWLEDGE_BASE_NAME=customer-support-kb
+AZURE_SEARCH_ORDERS_INDEX=orders
+EOF
+  echo ""
+}
+
 # ── Main ────────────────────────────────────────────────────────────────────
 main() {
   local target="${1:-all}"
@@ -278,15 +324,18 @@ main() {
     backend)
       deploy_backend
       smoke_test
+      print_env_summary
       ;;
     frontend)
       deploy_frontend
       smoke_test
+      print_env_summary
       ;;
     all)
       deploy_backend
       deploy_frontend
       smoke_test
+      print_env_summary
       ;;
     test)
       smoke_test
