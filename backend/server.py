@@ -1125,41 +1125,17 @@ async def _persist_turn(
     title: str | None,
     rag_mode: str | None = None,
 ) -> None:
-    """Append the latest user+assistant turn to the Cosmos DB conversation."""
-    try:
-        new_messages = [
-            {"role": "user", "content": user_message},
-            {"role": "assistant", "content": assistant_message},
-        ]
-        metadata: dict[str, Any] = {
-            "agent_name": "CustomerSupportAgent",
-            "model_deployment": model_deployment,
-            "api": "responses",
-            "store": False,
-        }
-        if rag_mode:
-            metadata["rag_mode"] = rag_mode
+    """Append the latest user+assistant turn to the Cosmos DB conversation.
 
-        # Fetch existing conversation to append
-        existing = await conversation_store.get_conversation(session_id, user_id)
-        if existing and existing.get("messages"):
-            all_messages = existing["messages"] + new_messages
-            # Merge metadata — keep existing keys, overwrite with new
-            old_meta = existing.get("metadata") or {}
-            old_meta.update(metadata)
-            metadata = old_meta
-        else:
-            all_messages = new_messages
-
-        await conversation_store.save_conversation(
-            session_id=session_id,
-            user_id=user_id,
-            messages=all_messages,
-            title=title,
-            metadata=metadata,
-        )
-    except Exception as e:
-        logger.error("Failed to persist turn id=%s: %s", session_id, str(e), exc_info=True)
+    TODO: Implement as part of Challenge 02.
+    This function is called after every completed agent turn (see stream_agent_response).
+    It should:
+      1. Build message dicts for the user and assistant messages
+      2. Fetch the existing conversation (if any) and append the new messages
+      3. Call conversation_store.save_conversation() with the full message list
+    """
+    # TODO: Implement conversation persistence
+    pass
 
 
 async def stream_agent_response(
