@@ -30,6 +30,32 @@ This project supports two RAG approaches — you will implement the **agentic** 
 - ✅ `prompts/customer_support.j2` instructs the agent about order status and memory tools — but has **no knowledge base instructions**
 - ✅ Environment variables (`AZURE_SEARCH_ENDPOINT`, `AZURE_SEARCH_KNOWLEDGE_BASE_NAME`) are configured in `.env`
 
+## Prerequisites: Load the Knowledge Base
+
+Before you start coding, you need to populate Azure AI Search with the sample documents (orders and return policies). A setup script is provided:
+
+```bash
+cd setup/knowledgebase
+pip install -r requirements.txt
+python setup_search.py
+```
+
+This script creates two search indexes (`orders` and `return-policy`), uploads documents with vector embeddings, sets up knowledge sources, and creates a knowledge base that aggregates both sources.
+
+**Required environment variables** (should already be in your `.env` or exported):
+
+| Variable | Description |
+|----------|-------------|
+| `AZURE_SEARCH_ENDPOINT` | Azure AI Search endpoint URL |
+| `AZURE_OPENAI_ENDPOINT` | Azure OpenAI endpoint (for generating embeddings) |
+| `AZURE_OPENAI_EMBEDDING_DEPLOYMENT_NAME` | Embedding model deployment (default: `text-embedding-3-large`) |
+
+> The script uses `DefaultAzureCredential` — make sure you're logged in via `az login`.
+
+Once the script completes successfully you should see confirmation that both indexes are populated and the knowledge base is created. You can also verify in the Azure Portal under your AI Search resource → **Indexes** and **Knowledge bases**.
+
+---
+
 ## Your Task
 
 There are four parts. The **PRD document** describes the full specification:
