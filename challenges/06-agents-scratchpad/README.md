@@ -89,6 +89,6 @@ After implementing both parts:
 - Do not rewrite the scratchpad classes
 - If the document is being written correctly but never properly finalized, you are looking in the right place
 
-If students get blocked, they can compare their work with:
+If you get blocked, compare your work with:
 
 - `solutions\06-agents-scratchpad\README.md`

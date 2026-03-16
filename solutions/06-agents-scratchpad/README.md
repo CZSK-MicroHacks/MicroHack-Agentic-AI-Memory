@@ -79,4 +79,4 @@ After the fix, the workflow should behave like this:
 4. the facilitator reads the clean version
 5. the final answer reflects the reviewed itinerary
 
-If students complete those two seams, they have completed the challenge.
+Completing those two seams resolves the challenge.
