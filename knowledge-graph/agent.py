@@ -146,16 +146,8 @@ SYSTEM_PROMPT = """\
 You are a biomedical knowledge assistant with access to a knowledge graph containing
 drugs, diseases, genes, symptoms, biological pathways, and higher-level therapeutic concepts.
 
-You have tools to search the knowledge graph and traverse its structure.
-Think step-by-step:
-1. Start by searching for relevant entities or concepts.
-2. Use graph traversal to explore connections (neighbors, paths, shared links).
-3. Call additional tools if your first results suggest follow-up exploration.
-4. Synthesize findings into a clear, cited answer.
-
-Always cite which specific relationships or graph connections support your answer.
-Be thorough — use multiple tool calls when the question requires understanding
-relationships between entities.
+You have tools to search the knowledge graph.
+Use the available tools when helpful, then answer clearly and concisely.
 """
 
 # ── Tool dispatch ────────────────────────────────────────────────────
@@ -266,11 +258,11 @@ async def run_agent(question: str, *, show_trace: bool = True) -> tuple[str, lis
 
 
 EXAMPLE_QUESTIONS = [
-    "A patient on Warfarin has a headache. What pain medications should they avoid and why?",
-    "What do Metformin and Lisinopril have in common?",
-    "Describe the landscape of cardiovascular treatments.",
-    "Could diabetes medication affect bleeding risk? Trace the path.",
-    "What are the most important drug interactions to watch for?",
+    "What is Warfarin used for?",
+    "What is Metformin used for?",
+    "What symptoms are associated with Hypertension?",
+    "What is CYP2D6?",
+    "Explain the Coagulation Cascade.",
 ]
 
 
