@@ -3,9 +3,14 @@
 # deploy.sh – Build & deploy backend + frontend to Azure Container Apps
 #
 # Usage:
-#   ./setup/deploy.sh               # deploy both
-#   ./setup/deploy.sh backend       # deploy backend only
-#   ./setup/deploy.sh frontend      # deploy frontend only
+#   ./setup/deploy.sh                                            # deploy both
+#   ./setup/deploy.sh backend                                    # deploy backend only
+#   ./setup/deploy.sh frontend                                   # deploy frontend only
+#   ./setup/deploy.sh -g my-rg -p myproject backend              # custom RG & project
+#
+# Options:
+#   -g, --resource-group   Azure resource group  (default: rg-mhaimemk-001)
+#   -p, --project-name     Project name prefix   (default: mhaimemk001)
 #
 # Prerequisites:
 #   - az CLI logged in
@@ -16,9 +21,23 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
+# ── Parse named parameters ──────────────────────────────────────────────────
+_RESOURCE_GROUP=""
+_PROJECT_NAME=""
+POSITIONAL_ARGS=()
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    -g|--resource-group) _RESOURCE_GROUP="$2"; shift 2 ;;
+    -p|--project-name)   _PROJECT_NAME="$2";   shift 2 ;;
+    *)                   POSITIONAL_ARGS+=("$1"); shift ;;
+  esac
+done
+set -- "${POSITIONAL_ARGS[@]}"
+
 # ── Configuration (derived from Terraform outputs) ──────────────────────────
-RESOURCE_GROUP="rg-mhaimemk-001"
-PROJECT_NAME="mhaimemk001"
+RESOURCE_GROUP="${_RESOURCE_GROUP:-rg-mhaimemk-001}"
+PROJECT_NAME="${_PROJECT_NAME:-mhaimemk001}"
 SUBSCRIPTION_ID="6766574f-da48-496f-b65a-18d9e5f726a4"
 
 echo "Starting deployment of projet ${PROJECT_NAME} into RG: ${RESOURCE_GROUP} (sub: ${SUBSCRIPTION_ID})..."
@@ -322,6 +341,58 @@ EOF
   echo ""
 }
 
+# ── Write backend/.env (only if it does not already exist) ─────────────────
+write_backend_env() {
+  local env_file="${PROJECT_ROOT}/backend/.env"
+  if [[ -f "$env_file" ]]; then
+    ok "backend/.env already exists – skipping creation"
+    return 0
+  fi
+
+  log "Creating ${env_file}…"
+  cat > "$env_file" <<EOF
+# Azure OpenAI Configuration
+AZURE_OPENAI_ENDPOINT=${OPENAI_ENDPOINT}
+AZURE_OPENAI_DEPLOYMENT_NAME=gpt-4o-mini
+AZURE_OPENAI_EMBEDDING_DEPLOYMENT_NAME=text-embedding-3-large
+
+# ── Azure Cosmos DB (Conversation History) ──────────────────
+COSMOS_ENDPOINT=${COSMOS_ENDPOINT}
+COSMOS_DATABASE_NAME=ag-ui-db
+COSMOS_CONTAINER_NAME=conversations
+
+COSMOS_UPM_DATABASE_NAME=ag-ui-db
+COSMOS_UPM_CONTAINER_NAME=user_profiles
+
+# Local auth mode
+AUTH_MODE=${AUTH_MODE}
+# These variables are only needed for Entra authentication
+# AZURE_CLIENT_ID=${IDENTITY_CLIENT_ID}
+# ENTRA_TENANT_ID=${ENTRA_TENANT_ID}
+# ENTRA_AUDIENCE=${BACKEND_API_CLIENT_ID}
+# ENTRA_REQUIRED_SCOPES=access_as_user
+
+# Postgres db
+PG_HOST=${PG_FQDN}
+PG_PORT=5432
+PG_DATABASE=appdb
+PG_AUTH_MODE=managed_identity
+PG_AAD_PRINCIPAL_NAME=id-${PROJECT_NAME}
+
+# Azure AI Search
+AZURE_SEARCH_ENDPOINT=${SEARCH_ENDPOINT}
+AZURE_SEARCH_KNOWLEDGE_BASE_NAME=customer-support-kb
+AZURE_SEARCH_ORDERS_INDEX=orders
+
+# Azure Cache for Redis (Session Memory)
+REDIS_HOST=${REDIS_HOST}
+REDIS_PORT=6380
+REDIS_PASSWORD=${REDIS_PASSWORD}
+REDIS_SSL=true
+EOF
+  ok "backend/.env created"
+}
+
 # ── Main ────────────────────────────────────────────────────────────────────
 main() {
   local target="${1:-all}"
@@ -337,17 +408,20 @@ main() {
       deploy_backend
       smoke_test
       print_env_summary
+      write_backend_env
       ;;
     frontend)
       deploy_frontend
       smoke_test
       print_env_summary
+      write_backend_env
       ;;
     all)
       deploy_backend
       deploy_frontend
       smoke_test
       print_env_summary
+      write_backend_env
       ;;
     test)
       smoke_test

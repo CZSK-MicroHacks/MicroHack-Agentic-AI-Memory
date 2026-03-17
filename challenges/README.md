@@ -2,6 +2,17 @@
 
 This MicroHack guides you through the key memory patterns used in modern agentic AI systems. Each challenge focuses on a distinct memory type — from short-lived session state to long-term knowledge retrieval — giving you hands-on experience building AI applications that remember, reason, and adapt. Work through the challenges in order, as later ones build on concepts introduced earlier.
 
+## Prerequisites
+1. Run deployment script `setup/deploy.sh` to deploy backend and frontend resources to Azure and set the `.env` file. Use your RESOURCE_GROUP and PROJECT_NAME as parameters.
+
+```sh
+setup/deploy.sh -g <RESOURCE_GROUP> -p <PROJECT_NAME>
+```
+
+> Note: this will also create an `.env` file with the necessary environment variables for local development. Check the file and make sure all values are correct.
+
+
+
 ## Challenges
 
 | # | Challenge | Description |
