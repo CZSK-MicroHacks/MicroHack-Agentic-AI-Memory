@@ -9,9 +9,35 @@ This MicroHack guides you through the key memory patterns used in modern agentic
 setup/deploy.sh -g <RESOURCE_GROUP> -p <PROJECT_NAME>
 ```
 
+Resource group is something like `rg-mhaimemk-001` and project name is something like `mhaimemk001`. (number represent your user's suffix).
+
 > Note: this will also create an `.env` file with the necessary environment variables for local development. Check the file and make sure all values are correct.
 
+2. Start the backend and frontend servers locally:
 
+```sh
+# Start backend server
+cd backend
+uv sync
+uv run server.py
+```
+
+```sh
+# Start frontend server
+cd frontend
+npm install
+npm run dev
+```
+
+Navigate to frontend url `http://localhost:5173` in your browser to access the UI. 
+
+> Note: the port might be different, check the terminal output when you start the frontend server. Also if you are using codespaces, make sure to forward the port to access the UI.
+
+You should see the UI:
+![UI Screenshot](./docs/ui.png)
+
+
+Now you're ready to start the challenges!
 
 ## Challenges
 
