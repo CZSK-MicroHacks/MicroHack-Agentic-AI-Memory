@@ -10,7 +10,6 @@ wheels/
 
 # Env files
 .env
-.env.*
 
 # Node/Frontend
 node_modules/
